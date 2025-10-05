@@ -1,6 +1,8 @@
 const express = require("express");
 const Joi = require("joi");
-const Api = require("../models/api.model");
+const Api = require("../models/api.model").default;
+
+
 
 const router = express.Router();
 

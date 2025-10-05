@@ -1,7 +1,7 @@
 const express = require("express");
 const Joi = require("joi");
-const Metric = require("../models/metric.model");
-const Api = require("../models/api.model");
+const Metric = require("../models/metric.model").default;
+const Api = require("../models/api.model").default;
 const { evaluateRulesForMetric } = require("../services/ruleEngine");
 
 const router = express.Router();

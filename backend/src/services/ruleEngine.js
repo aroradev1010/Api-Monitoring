@@ -1,4 +1,4 @@
-const Alert = require("../models/alert.model");
+const Alert = require("../models/alert.model").default;
 const { notify } = require("./alertManager");
 
 async function evaluateRulesForMetric(metric) {

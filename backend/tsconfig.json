@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    /* Output settings */
+    "outDir": "dist", // compiled JS files go here
+    "rootDir": "src", // where your TypeScript source files are
+
+    /* Language and module target */
+    "target": "ES2020", // modern JS output
+    "module": "CommonJS", // Node.js compatible module system
+
+    /* Strictness & type checking */
+    "strict": true, // enables all strict type checks
+    "noImplicitAny": false, // allow 'any' types for now (we’ll tighten later)
+
+    /* Module resolution and interop */
+    "esModuleInterop": true, // allows 'import express from "express"'
+    "resolveJsonModule": true, // lets you import .json files
+    "skipLibCheck": true, // skip type checking of node_modules for faster build
+    "allowJs": true, // allows JS + TS mix during migration
+
+    /* Debug & tooling */
+    "sourceMap": true, // generate source maps for easier debugging
+    "forceConsistentCasingInFileNames": true // ensures case-sensitive imports
+  },
+  "include": ["src/**/*"], // include everything inside src/
+  "exclude": ["node_modules", "dist"] // exclude build output and dependencies
+}
