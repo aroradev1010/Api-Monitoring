@@ -1,5 +1,6 @@
 // src/services/db.ts
 import mongoose from "mongoose";
+import logger from "../logger";
 
 export async function connectDB(): Promise<void> {
   const uri = process.env.MONGO_URI || "mongodb://localhost:27017/apimon";
@@ -8,5 +9,5 @@ export async function connectDB(): Promise<void> {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   } as any);
-  console.log("MongoDB connected");
+  logger.info("MongoDB connected");
 }

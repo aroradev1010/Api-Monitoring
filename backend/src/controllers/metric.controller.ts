@@ -3,8 +3,8 @@ import { Request, Response } from "express";
 import Metric from "../models/metric.model";
 import Api from "../models/api.model";
 import { evaluateRulesForMetric } from "../services/ruleEngine";
+import logger from "../logger";
 export async function ingestMetric(req: Request, res: Response) {
-
   try {
     const value = req.body;
     const api = await Api.findOne({ api_id: value.api_id });
@@ -15,12 +15,12 @@ export async function ingestMetric(req: Request, res: Response) {
 
     // prototype: evaluate rules asynchronously
     evaluateRulesForMetric(metric).catch((e) =>
-      console.error("Rule eval failed", e)
+      logger.error({ e }, "Rule eval failed")
     );
 
     return res.status(202).json({ status: "accepted" });
   } catch (err: any) {
-    console.error("ingestMetric error", err);
+    logger.error({ err }, "ingestMetric error");
     return res.status(500).json({ error: err.message || "internal error" });
   }
 }
@@ -34,7 +34,7 @@ export async function getMetrics(req: Request, res: Response) {
       .limit(parseInt(String(limit)));
     return res.json(metrics);
   } catch (err: any) {
-    console.error("getMetrics error", err);
+    logger.error({ err }, "getMetrics error");
     return res.status(500).json({ error: err.message || "internal error" });
   }
 }

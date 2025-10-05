@@ -1,6 +1,7 @@
 // src/config/index.ts
 import dotenv from "dotenv";
 import Joi from "joi";
+import logger from "../logger";
 
 dotenv.config(); // load .env into process.env
 
@@ -24,9 +25,9 @@ const { value: envVars, error } = envSchema.validate(process.env, {
 
 if (error) {
   // Print validation errors and exit — fail-fast on missing/invalid config.
-  console.error("❌ Invalid environment configuration:");
+  logger.error({ error }, "❌ Invalid environment configuration:");
   error.details.forEach((d) => {
-    console.error(`  - ${d.message}`);
+    logger.error(`  - ${d.message}`);
   });
   // Using synchronous exit so process manager (or CI) sees failure
   process.exit(1);

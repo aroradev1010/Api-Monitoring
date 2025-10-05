@@ -6,6 +6,7 @@ import apisRouter from "./routes/apis";
 import metricsRouter from "./routes/metrics";
 import { connectDB } from "./services/db";
 import errorHandler from "./middlewares/errorHandler";
+import logger from "./logger";
 
 const app = express();
 app.use(cors());
@@ -21,10 +22,13 @@ const port = config.PORT;
 connectDB()
   .then(() => {
     app.listen(port, () => {
-      console.log(`Ingest service running on http://localhost:${port}`);
+      logger.info(
+        { port },
+        `Ingest service running on http://localhost:${port}`
+      );
     });
   })
   .catch((err) => {
-    console.error("Failed to connect DB:", err);
+    logger.error({ err }, "Failed to connect DB");
     process.exit(1);
   });

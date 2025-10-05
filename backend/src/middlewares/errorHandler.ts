@@ -1,6 +1,7 @@
 // src/middlewares/errorHandler.ts
 import { NextFunction, Request, Response } from "express";
 import config from "../config";
+import logger from "../logger";
 
 /**
  * Generic error handling middleware. Use app.use(errorHandler) at the end.
@@ -15,7 +16,7 @@ export default function errorHandler(
   // optional: more structured logging can go here (winston/pino)
   if (config.NODE_ENV !== "production") {
     // eslint-disable-next-line no-console
-    console.error("Unhandled error:", err);
+    logger.error({ err }, "Unhandled error:");
   } else {
     // In production you would log to a file or external service
   }
