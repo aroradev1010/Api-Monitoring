@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: "npm"
           # Tell setup-node where the lockfile for caching lives
           cache-dependency-path: backend/package-lock.json
 
@@ -32,6 +32,12 @@ jobs:
 
       - name: Run tests (backend)
         run: npm test
+        working-directory: backend
+        env:
+          NODE_ENV: test
+
+      - name: Run tests (with coverage)
+        run: npm test -- --coverage
         working-directory: backend
         env:
           NODE_ENV: test
