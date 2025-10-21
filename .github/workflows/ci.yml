@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Run tests
+    name: Run backend tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,24 +23,15 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+          # Tell setup-node where the lockfile for caching lives
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies (backend)
         run: npm ci
         working-directory: backend
 
-      - name: Run tests
+      - name: Run tests (backend)
         run: npm test
         working-directory: backend
         env:
           NODE_ENV: test
-
-      # Optional: collect coverage artifact (uncomment if you enable coverage in jest)
-      # - name: Run tests with coverage
-      #   run: npm test -- --coverage
-      #   working-directory: backend
-      #
-      # - name: Upload coverage report
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: coverage-report
-      #     path: backend/coverage
