@@ -1,0 +1,42 @@
+services:
+  mongo:
+    image: mongo:6
+    container_name: apimon-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: apimon-backend
+    depends_on:
+      - mongo
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      # use the internal docker service name for mongo
+      MONGO_URI: mongodb://mongo:27017/apimon
+      PROBE_DEFAULT_INTERVAL: 30
+      # SLACK_WEBHOOK: ""   # set in .env if needed
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app  # optional: for live-reload during development (remove for strict prod)
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('dns').lookup('mongo',()=>console.log('ok')) || process.exit(0)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  mongo-data:
