@@ -6,6 +6,9 @@ const config: Config.InitialOptions = {
   testEnvironment: "node",
   testMatch: ["**/tests/**/*.test.ts"],
   verbose: true,
+  collectCoverage: true,
+  coverageDirectory: "coverage",
+  collectCoverageFrom: ["src/**/*.ts", "!src/**/tests/**", "!src/index.ts"],
   // run tests serially; memory-server plays nicer with single-threaded runs
   maxWorkers: 1,
   // Increase default timeout for slow CI or cold in-memory Mongo spins
