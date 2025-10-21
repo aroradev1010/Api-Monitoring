@@ -1,6 +1,7 @@
-# 🧠 Intelligent API Performance Monitoring System  
+# 🧠 Intelligent API Performance Monitoring System
 
-> **A real-time API monitoring platform** that tracks uptime, latency, and errors for registered APIs — complete with a probe agent, rule-based alert engine, and DevOps-ready deployment pipeline.
+A real-time API monitoring platform that tracks uptime, latency, and errors for registered APIs.  
+Includes a probe agent, metrics ingestion backend, rule-based alerting engine, and DevOps-ready deployment with Docker and CI/CD.
 
 ---
 
@@ -10,10 +11,11 @@
 - [System Architecture](#system-architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Setup Instructions](#setup-instructions)
-- [Running Locally](#running-locally)
+- [Prerequisites](#prerequisites)
+- [Setup and Running Locally](#setup-and-running-locally)
 - [Docker Deployment](#docker-deployment)
 - [API Endpoints](#api-endpoints)
+- [Testing and CI](#testing-and-ci)
 - [Future Improvements](#future-improvements)
 - [Author](#author)
 - [License](#license)
@@ -22,22 +24,28 @@
 
 ## 🧩 Overview
 
-Modern applications depend on APIs for payments, authentication, data exchange, and third-party integrations.  
-Downtime or latency in these APIs can cause major system disruptions.  
+Modern applications depend heavily on APIs — for authentication, payments, and integrations.  
+If these APIs slow down or fail, the entire system can suffer.  
 
-This project provides a **modular monitoring system** that automatically checks APIs, stores performance metrics, and triggers alerts when thresholds are violated — similar to tools like **Datadog** or **Pingdom**, but designed for educational and DevOps learning purposes.
+This project provides a **complete monitoring platform** that:
+- Continuously probes APIs and measures their health,
+- Stores metrics in MongoDB,
+- Detects failures or slow responses,
+- Triggers alerts when performance degrades.
+
+Think of it as a simplified educational version of **Datadog**, **Pingdom**, or **New Relic**, built with Node.js, Docker, and CI/CD.
 
 ---
 
 ## ⚙️ Features
 
-- **API Registration:** Add and manage APIs to monitor.
-- **Probe Agent:** Continuously tests APIs and reports metrics.
-- **Metrics Service:** Collects, stores, and evaluates incoming data.
-- **Rule Engine:** Detects performance anomalies.
-- **Alert Manager:** Generates alerts when thresholds are breached.
-- **Dashboard UI:** Visualizes APIs, latency graphs, and alert history.
-- **DevOps Ready:** Docker, CI/CD, and monitoring stack integration.
+✅ **API Registration:** Add APIs to monitor and store configurations.  
+✅ **Probe Agent:** Periodically tests APIs and reports latency and status codes.  
+✅ **Metrics Service:** Ingests and stores metrics efficiently.  
+✅ **Rule Engine (WIP):** Detects anomalies and thresholds.  
+✅ **Alert Manager:** Emits alerts when APIs are down or too slow.  
+✅ **Dashboard (Planned):** Visualize metrics and alerts via frontend.  
+✅ **DevOps-Ready:** Docker + GitHub Actions for deployment and testing.
 
 ---
 
@@ -45,57 +53,55 @@ This project provides a **modular monitoring system** that automatically checks 
 
 ```mermaid
 flowchart LR
-    subgraph Probe
-        A[Probe Agent] -->|Collects metrics| B(Backend /v1/metrics)
-    end
+  subgraph Probe
+    A[Probe Agent] -->|Sends Metrics| B(Backend /v1/metrics)
+  end
 
-    subgraph Backend
-        B --> C[MongoDB]
-        B --> D[Rule Engine]
-        D --> E[Alert Manager]
-        E --> F[(Alerts DB)]
-    end
+  subgraph Backend
+    B --> C[(MongoDB)]
+    B --> D[Rule Engine]
+    D --> E[Alert Manager]
+    E --> F[(Alerts DB)]
+  end
 
-    subgraph Frontend
-        G[React Dashboard] -->|Reads metrics| B
-    end
-
-    B -->|API Registration| H[/Registered APIs/]
-💻 Tech Stack
-Backend:
+  subgraph Frontend
+    G[React Dashboard] -->|Reads Metrics| B
+  end
+🧰 Tech Stack
+Backend
 
 Node.js + Express
+
+TypeScript
 
 MongoDB + Mongoose
 
 Joi (validation)
 
-Axios (HTTP client)
+Pino (logging)
 
-Frontend:
+Probe
 
-React
+Node.js + Axios
 
-TailwindCSS or Material-UI
+Frontend
 
-Axios for API calls
+React + TailwindCSS or Material-UI (planned)
 
-Probe:
+Axios for API communication
 
-Node.js standalone monitoring agent
-
-DevOps & Tools:
+DevOps
 
 Docker & Docker Compose
 
-GitHub Actions (CI/CD)
+GitHub Actions (CI)
 
-Postman / curl for testing
+Jest + Supertest (testing)
 
-Prometheus + Grafana (optional future integration)
+Prometheus + Grafana (future integration)
 
 📁 Project Structure
-pgsql
+lua
 Copy code
 api-monitoring/
 │
@@ -104,113 +110,85 @@ api-monitoring/
 │   │   ├── models/
 │   │   ├── routes/
 │   │   ├── services/
-│   │   └── index.js
+│   │   └── index.ts
 │   ├── package.json
 │   ├── Dockerfile
-│   └── .gitignore
+│   └── jest.config.ts
 │
 ├── probe/
 │   └── probe.js
 │
 ├── frontend/
 │   ├── src/
-│   ├── package.json
-│   └── .gitignore
+│   └── package.json
 │
-├── docker-compose.yml *(planned)*
-├── .gitignore
+├── docker-compose.yml
+├── .github/workflows/ci.yml
 └── README.md
-🧰 Setup Instructions
-Prerequisites
+🧱 Prerequisites
 Node.js ≥ 18
 
-MongoDB (local or Docker)
-
-npm or yarn
+Docker & Docker Compose
 
 Git
 
-Clone Repository
+(Optional) MongoDB locally if not using Docker
+
+▶️ Setup and Running Locally
+1. Clone Repository
 bash
 Copy code
-git clone https://github.com/<your-username>/api-monitoring-system.git
-cd api-monitoring-system
-Install Dependencies
-Backend:
+git clone https://github.com/<your-username>/Api-Monitoring.git
+cd Api-Monitoring
+2. Backend Setup
 bash
 Copy code
 cd backend
 npm install
-Frontend:
-bash
-Copy code
-cd ../frontend
-npm install
-Probe:
-No install required (uses axios only).
-
-▶️ Running Locally
-Start MongoDB
-
-bash
-Copy code
-mongod
-or
-
-bash
-Copy code
-docker start apimon-mongo
-Start Backend
-
-bash
-Copy code
-cd backend
 npm run dev
-→ http://localhost:3000
+Backend will be available at http://localhost:3000
 
-Start Frontend
-
+3. Frontend Setup (optional)
 bash
 Copy code
 cd ../frontend
+npm install
 npm start
-→ http://localhost:3001
+Frontend will be available at http://localhost:3001
 
-Run Probe
-
+4. Probe Agent
 bash
 Copy code
 cd ../probe
 node probe.js
-✅ Expected:
-
-Probe logs success/failure metrics
-
-Metrics stored in MongoDB
-
-Alerts triggered for latency thresholds
+This will start sending metrics to the backend every few seconds.
 
 🐳 Docker Deployment
-Build Image
-bash
-Copy code
-cd backend
-docker build -t apimon-backend .
-Run Container
-bash
-Copy code
-docker run -p 3000:3000 \
-  -e MONGO_URI=mongodb://host.docker.internal:27017/apimon \
-  apimon-backend
-Backend will be available at http://localhost:3000
+Build & Run (recommended for production)
+From the project root:
 
-📡 API Endpoints
+bash
+Copy code
+docker-compose up --build
+This will:
+
+Start MongoDB (mongo container)
+
+Start backend (apimon-backend container)
+
+Map backend port to localhost:3000
+
+Stop Containers
+bash
+Copy code
+docker-compose down
+🌐 API Endpoints
 Method	Endpoint	Description
-POST	/v1/apis	Register new API
+POST	/v1/apis	Register a new API
 GET	/v1/apis	List all APIs
-POST	/v1/metrics	Send probe metrics
-GET	/v1/metrics?api_id=<id>	Retrieve metrics for an API
-GET	/v1/alerts	Fetch all alerts
+POST	/v1/metrics	Send probe metric
+GET	/v1/metrics?api_id=<id>	Retrieve metrics for a specific API
+GET	/health	Health check endpoint
 
 Example:
 
@@ -219,46 +197,41 @@ Copy code
 curl -X POST http://localhost:3000/v1/apis \
   -H "Content-Type: application/json" \
   -d '{"api_id":"demo-api","name":"Demo API","base_url":"https://httpbin.org/delay/0","probe_interval":30,"expected_status":[200]}'
-🚀 Future Improvements
- TypeScript migration
-
- Logger integration (Winston/Pino)
-
- Role-based access (JWT/OAuth2)
-
- Slack / Email alert integration
-
- Prometheus metrics export
-
- Historical charts (Grafana)
-
- CI/CD pipeline (GitHub Actions)
-
- Kubernetes deployment
-
-👨‍💻 Author
-Dev Arora
-Software Engineering Student | DevOps & Full Stack Enthusiast
-
-GitHub: github.com/<your-username>
-
-LinkedIn: linkedin.com/in/<your-handle>
-
-📜 License
-MIT License — free to use and modify for learning and research.
-
-yaml
+🧪 Testing and CI
+Run Tests Locally
+bash
 Copy code
+cd backend
+npm test
+Run Tests with Coverage
+bash
+Copy code
+npm test -- --coverage
+This generates a coverage/ folder showing how much of your code is tested.
 
----
+CI Pipeline
+Every push or pull request to the main branch triggers:
 
-### ✅ Usage
-1. Copy the text above into a file named **`README.md`** in your project root.
-2. Replace:
-   - `<your-username>` → your GitHub username  
-   - `<your-handle>` → your LinkedIn handle  
-3. Commit and push:
-   ```bash
-   git add README.md
-   git commit -m "Added professional README with architecture and setup instructions"
-   git push
+Automatic installation of dependencies
+
+Jest test run (with coverage)
+
+Upload of coverage artifact
+
+Workflow file: .github/workflows/ci.yml
+
+🚀 Future Improvements
+Slack / Email alert integration
+
+Grafana dashboard visualization
+
+Rule-based anomaly detection engine
+
+Role-based access (JWT/OAuth2)
+
+Prometheus metrics exporter
+
+Kubernetes deployment manifests
+
+Frontend monitoring dashboard
+
