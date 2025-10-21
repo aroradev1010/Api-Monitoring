@@ -12,7 +12,11 @@ const envSchema = Joi.object({
     .valid("development", "production", "test")
     .default("development"),
   PORT: Joi.number().integer().min(1).max(65535).default(3000),
-  MONGO_URI: Joi.string().uri().required(),
+  MONGO_URI: Joi.when("NODE_ENV", {
+    is: Joi.valid("test"),
+    then: Joi.string().uri().optional().allow("", null),
+    otherwise: Joi.string().uri().required(),
+  }),
   PROBE_DEFAULT_INTERVAL: Joi.number().integer().min(1).default(30),
   SLACK_WEBHOOK: Joi.string().uri().allow("", null).optional(),
 }).unknown(true); // allow other environment vars
