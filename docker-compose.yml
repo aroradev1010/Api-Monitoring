@@ -26,7 +26,7 @@ services:
       # use the internal docker service name for mongo
       MONGO_URI: mongodb://mongo:27017/apimon
       PROBE_DEFAULT_INTERVAL: 30
-      # SLACK_WEBHOOK: ""   # set in .env if needed
+      SLACK_WEBHOOK: ${SLACK_WEBHOOK}  
     ports:
       - "3000:3000"
     volumes:
