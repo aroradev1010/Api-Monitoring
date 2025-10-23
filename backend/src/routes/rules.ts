@@ -1,14 +1,11 @@
+// backend/src/routes/rules.ts
 import express from "express";
-import {
-  createRule,
-  listRules,
-  deleteRule,
-} from "../controllers/rules.controller";
+import { createRule, deleteRule, listRules } from "../controllers/rules.controller";
 
 const router = express.Router();
 
 router.post("/", createRule);
 router.get("/", listRules);
-router.delete("/:id", deleteRule);
+router.delete("/:rule_id", deleteRule);
 
 export default router;

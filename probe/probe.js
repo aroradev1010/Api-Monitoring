@@ -3,7 +3,7 @@ const axios = require("axios");
 
 const INGEST_URL = process.env.INGEST_URL || "http://localhost:3000/v1/metrics";
 const TARGET = process.env.TARGET || "https://youtube.com";
-const API_ID = process.env.API_ID || "demo-api-test";
+const API_ID = process.env.API_ID || "demo-api";
 
 async function probeOnce() {
   const start = Date.now();
