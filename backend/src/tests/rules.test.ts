@@ -37,6 +37,7 @@ describe("Rules API", () => {
       .post("/v1/rules")
       .send(rule)
       .set("Accept", "application/json");
+      
     expect([200, 201]).toContain(res.status);
 
     const list = await request(app).get("/v1/rules");

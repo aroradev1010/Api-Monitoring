@@ -4,10 +4,11 @@ import Joi, { ObjectSchema } from "joi";
 /**
  * Validation schema for POST /v1/metrics (ingest)
  */
+const idPattern = /^[A-Za-z0-9_-]+$/;
+
 export const ingestMetricSchema: ObjectSchema = Joi.object({
-  api_id: Joi.string().alphanum().min(1).max(128).required().messages({
+  api_id: Joi.string().pattern(idPattern).min(1).max(128).required().messages({
     "string.empty": "api_id is required",
-    "string.alphanum": "api_id must be alphanumeric",
   }),
   // Accept either an ISO date string or a JS date - server will coerce
   timestamp: Joi.alternatives().try(Joi.date().iso(), Joi.date()).optional(),

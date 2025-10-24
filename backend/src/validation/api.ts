@@ -4,9 +4,10 @@ import Joi, { ObjectSchema } from "joi";
 /**
  * POST /v1/apis payload validation
  */
+
+const idPattern = /^[A-Za-z0-9_-]+$/;
 export const createApiSchema: ObjectSchema = Joi.object({
-  api_id: Joi.string().alphanum().min(3).max(50).required().messages({
-    "string.alphanum": "api_id must be alphanumeric",
+  api_id: Joi.string().pattern(idPattern).min(3).max(50).required().messages({
     "string.empty": "api_id is required",
   }),
   name: Joi.string().min(1).max(200).required().messages({

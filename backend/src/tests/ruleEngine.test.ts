@@ -69,19 +69,21 @@ describe("Rule Engine & Alerts (integration)", () => {
   test("creates and resolves an alert for a latency_gt rule", async () => {
     // 1) create API
     const apires = await request(app).post("/v1/apis").send(apiPayload);
+
     expect([200, 201]).toContain(apires.status);
 
     // 2) create rule
     const rres = await request(app).post("/v1/rules").send(rulePayload);
+    
     expect([200, 201]).toContain(rres.status);
-
+    
     // Ensure no alerts exist initially
     let alerts = await Alert.find({
       rule_id: rulePayload.rule_id,
       api_id: rulePayload.api_id,
     });
     expect(alerts.length).toBe(0);
-
+    
     // 3) send a bad metric that should trigger the alert (latency 1000ms > 500)
     const badMetric = {
       api_id: apiPayload.api_id,
@@ -91,8 +93,9 @@ describe("Rule Engine & Alerts (integration)", () => {
       error: null,
       tags: {},
     };
-
+    
     const mres1 = await request(app).post("/v1/metrics").send(badMetric);
+
     expect([200, 202]).toContain(mres1.status);
 
     // Wait for async rule engine to create the alert

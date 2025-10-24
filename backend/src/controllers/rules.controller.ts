@@ -1,36 +1,40 @@
 // backend/src/controllers/rule.controller.ts
 import { Request, Response } from "express";
-import Joi from "joi";
 import Rule from "../models/rule.model";
 import logger from "../logger";
 
-const ruleSchema = Joi.object({
-  rule_id: Joi.string().required(),
-  name: Joi.string().required(),
-  api_id: Joi.string().required(),
-  type: Joi.string().valid("latency_gt", "status_not").required(),
-  threshold: Joi.alternatives()
-    .try(Joi.number().integer(), Joi.array())
-    .required(),
-});
-
 export async function createRule(req: Request, res: Response) {
-  const { error, value } = ruleSchema.validate(req.body);
-  if (error) return res.status(400).json({ error: error.message });
-
   try {
+    // Defensive: ensure body exists and has required field (in case middleware was not applied)
+    if (!req.body || typeof req.body.rule_id !== "string") {
+      return res
+        .status(400)
+        .json({ error: "Invalid payload: rule_id required" });
+    }
+
+    const value = req.body as {
+      rule_id: string;
+      name: string;
+      api_id?: string | null;
+      type: string;
+      threshold: number | number[];
+    };
+
     const existing = await Rule.findOne({ rule_id: value.rule_id }).exec();
-    if (existing)
+    if (existing) {
       return res.status(409).json({ error: "rule_id already exists" });
+    }
 
     const r = new Rule(value);
     await r.save();
     logger.info({ rule_id: r.rule_id, api_id: r.api_id }, "Rule created");
     return res.status(201).json(r);
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    logger.error({ err }, "createRule failed");
+    return res.status(500).json({ error: err?.message ?? "internal error" });
   }
 }
+
 
 export async function listRules(req: Request, res: Response) {
   const { api_id } = req.query;

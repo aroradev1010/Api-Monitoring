@@ -7,8 +7,10 @@ import Metric from "../models/metric.model";
 import Rule from "../models/rule.model";
 import Alert from "../models/alert.model";
 
+const idPattern = /^[A-Za-z0-9_-]+$/;
+
 const apiSchema = Joi.object({
-  api_id: Joi.string().alphanum().required(),
+  api_id: Joi.string().pattern(idPattern).required(),
   name: Joi.string().required(),
   base_url: Joi.string().uri().required(),
   probe_interval: Joi.number().integer().min(1).default(30),

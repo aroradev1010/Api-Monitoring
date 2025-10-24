@@ -4,15 +4,17 @@ import Joi, { ObjectSchema } from "joi";
 /**
  * POST /v1/rules payload validation
  */
+
+const idPattern = /^[A-Za-z0-9_-]+$/;
+
 export const createRuleSchema: ObjectSchema = Joi.object({
-  rule_id: Joi.string().alphanum().min(3).max(64).required().messages({
-    "string.alphanum": "rule_id must be alphanumeric",
+  rule_id: Joi.string().pattern(idPattern).min(3).max(64).required().messages({
     "string.empty": "rule_id is required",
   }),
   name: Joi.string().min(1).max(200).required().messages({
     "string.empty": "name is required",
   }),
-  api_id: Joi.string().alphanum().min(3).max(64).allow(null).optional(),
+  api_id: Joi.string().pattern(idPattern).min(3).max(64).allow(null).optional(),
   type: Joi.string().valid("latency_gt", "status_not").required().messages({
     "any.only": "type must be one of [latency_gt, status_not]",
   }),
