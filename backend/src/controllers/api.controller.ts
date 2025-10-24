@@ -3,6 +3,9 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import Api from "../models/api.model";
 import logger from "../logger";
+import Metric from "../models/metric.model";
+import Rule from "../models/rule.model";
+import Alert from "../models/alert.model";
 
 const apiSchema = Joi.object({
   api_id: Joi.string().alphanum().required(),
@@ -52,13 +55,35 @@ export async function getApi(req: Request, res: Response) {
 
 export async function deleteApi(req: Request, res: Response) {
   const { api_id } = req.params;
+
   try {
-    const r = await Api.deleteOne({ api_id }).exec();
-    if (r.deletedCount === 0)
-      return res.status(404).json({ error: "Not found" });
+    // First, delete the API itself
+    const result = await Api.deleteOne({ api_id }).exec();
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "API not found" });
+    }
+
+    // Cascade delete associated data (metrics, rules, alerts)
+    const [metricsDel, rulesDel, alertsDel] = await Promise.all([
+      Metric.deleteMany({ api_id }).exec(),
+      Rule.deleteMany({ api_id }).exec(),
+      Alert.deleteMany({ api_id }).exec(),
+    ]);
+
+    logger.info(
+      {
+        api_id,
+        deletedMetrics: metricsDel.deletedCount,
+        deletedRules: rulesDel.deletedCount,
+        deletedAlerts: alertsDel.deletedCount,
+      },
+      "API deleted along with related records"
+    );
+
     return res.status(204).send();
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    logger.error({ err, api_id }, "Failed to delete API and related data");
+    return res.status(500).json({ error: "Failed to delete API" });
   }
 }
 

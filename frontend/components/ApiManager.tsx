@@ -25,6 +25,7 @@ export default function ApiManager({ onApiCreated }: { onApiCreated?: (id: strin
 
     async function reload() {
         setLoading(true);
+        console.log("Reloading APIs...");
         setError(null);
         try {
             setApis(await listApis());
@@ -57,7 +58,7 @@ export default function ApiManager({ onApiCreated }: { onApiCreated?: (id: strin
         }
     }
 
-    function confirmDelete(apiId: string) {
+    async function confirmDelete(apiId: string) {
         showConfirmToast({
             title: `Delete API ${apiId}?`,
             description: "This will remove the API and all future probes.",
@@ -65,7 +66,7 @@ export default function ApiManager({ onApiCreated }: { onApiCreated?: (id: strin
             cancelLabel: "Cancel",
             onConfirm: async () => {
                 await deleteApi(apiId);
-                await reload(); // refresh APIs list
+                window.location.reload()
                 toast.success("API deleted");
             },
         });
