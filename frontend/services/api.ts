@@ -41,21 +41,21 @@ export async function getMetrics(
   );
   return handleRes<Metric[]>(res);
 }
-export async function postMetricSynthetic(api_id: string): Promise<Metric> {
-  const payload: Partial<Metric> = {
-    api_id,
-    timestamp: new Date().toISOString(),
-    latency_ms: Math.floor(Math.random() * 1200),
-    status_code: 200,
-    error: null,
-    tags: { manual: true },
-  };
-  const res = await fetch(`${BASE}/v1/metrics`, {
+
+
+export async function postMetricProbe(api_id: string, timeout = 10000) {
+  const res = await fetch(`${BASE}/v1/probe/${encodeURIComponent(api_id)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ timeout }),
   });
-  return handleRes<Metric>(res);
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => null);
+    throw new Error(`Probe failed (${res.status}): ${body ?? ""}`);
+  }
+  const json = await res.json();
+  return json; // returns { metric: {...} } (or { metric: .., warn: .. } on forward fail)
 }
 
 // Alerts

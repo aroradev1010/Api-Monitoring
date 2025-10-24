@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, Api, Metric } from "@/types";
-import { getMetrics, listAlerts, listApis, postMetricSynthetic } from "@/services/api";
+import { getMetrics, listAlerts, listApis, postMetricProbe } from "@/services/api";
 import ApiSelector from "@/components/ApiSelector";
 import ApiManager from "@/components/ApiManager";
 import RuleManager from "@/components/RuleManager";
@@ -86,8 +86,8 @@ export default function DashboardPage() {
         setProbeBusy(true);
         setError(null);
         try {
-            // post a synthetic metric — backend will accept it via /v1/metrics
-            await postMetricSynthetic(selectedApi);
+            // Call server-side probe (this returns the created metric)
+            await postMetricProbe(selectedApi);
             // reload data
             await loadMetrics(selectedApi);
             await loadAlerts(selectedApi);

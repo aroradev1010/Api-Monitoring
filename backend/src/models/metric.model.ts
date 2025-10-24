@@ -7,6 +7,7 @@ export interface IMetric extends Document {
   latency_ms: number;
   status_code: number;
   error?: string | null;
+  error_type?: string | null;
   tags?: Record<string, any>;
 }
 
@@ -16,6 +17,11 @@ const MetricSchema: Schema<IMetric> = new Schema({
   latency_ms: { type: Number, required: true },
   status_code: { type: Number, required: true },
   error: { type: String, default: null },
+  error_type: {
+    type: String,
+    enum: ["none", "timeout", "network", "http_error"],
+    default: "none",
+  },
   tags: { type: Schema.Types.Mixed },
 });
 
