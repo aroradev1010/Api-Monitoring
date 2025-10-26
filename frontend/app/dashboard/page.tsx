@@ -17,7 +17,7 @@ import ApiManager from "@/components/ApiManager";
 import RuleManager from "@/components/RuleManager";
 import AlertsList from "@/components/AlertsList";
 import MetricsTable from "@/components/MetricsTable";
-import { useSSE } from "@/hooks/useSSE";
+import { useStream } from "@/context/stream";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
@@ -31,11 +31,23 @@ export default function DashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [probeBusy, setProbeBusy] = useState(false);
 
-    // initial API list load (single shot)
+    const stream = useStream(); // get subscribe(), connected, lastPing
+
     useEffect(() => {
         reloadApis();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!selectedApi) {
+            setMetrics([]);
+            setAlerts([]);
+            return;
+        }
+        loadMetrics(selectedApi);
+        loadAlerts(selectedApi);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedApi]);
 
     async function reloadApis() {
         setLoadingApis(true);
@@ -50,19 +62,6 @@ export default function DashboardPage() {
             setLoadingApis(false);
         }
     }
-
-    // initial snapshot loads for the selected API
-    useEffect(() => {
-        if (!selectedApi) {
-            setMetrics([]);
-            setAlerts([]);
-            return;
-        }
-        // load initial snapshot only (stream will keep things live after this)
-        loadMetrics(selectedApi);
-        loadAlerts(selectedApi);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedApi]);
 
     async function loadMetrics(api_id: string) {
         setLoadingMetrics(true);
@@ -98,9 +97,8 @@ export default function DashboardPage() {
         setProbeBusy(true);
         setError(null);
         try {
-            // call server-side probe — the server will forward metric to ingest and SSE will push it
             await postMetricProbe(selectedApi);
-            // do NOT re-fetch here — SSE will deliver the new metric and update UI
+            // rely on SSE to update UI; no re-fetch here
         } catch (e: any) {
             setError(e?.message ?? "Manual probe failed");
         } finally {
@@ -108,11 +106,9 @@ export default function DashboardPage() {
         }
     }
 
-    // -------- SSE handlers: prepend and toast ----------
+    // SSE subscription uses provider's subscribe API
     const handleIncomingMetric = useCallback((m: Metric | any) => {
-        // Prepend metric and cap at 30 items
         setMetrics((prev) => {
-            // avoid duplicates: simple check by timestamp+api_id
             const key = `${m.api_id}:${m.timestamp ?? m.created_at ?? m._id ?? ""}`;
             if (prev.length) {
                 const firstKey = `${prev[0].api_id}:${(prev[0] as any).timestamp ?? (prev[0] as any).created_at ?? (prev[0] as any)._id ?? ""}`;
@@ -121,14 +117,11 @@ export default function DashboardPage() {
             return [m as Metric, ...prev].slice(0, 30);
         });
 
-        // Show small toast with action
         toast(`Metric: ${m.api_id} — ${m.latency_ms ?? "?"}ms (${m.status_code ?? "?"})`);
     }, []);
 
     const handleIncomingAlert = useCallback((a: Alert | any) => {
-        // Prepend alert (keep max 50)
         setAlerts((prev) => {
-            // dedupe by _id if exists or rule_id+timestamp-like key
             const id = (a as any)._id ?? `${a.rule_id}:${a.api_id}:${a.created_at ?? a.timestamp ?? Date.now()}`;
             if (prev.length) {
                 const first = prev[0] as any;
@@ -138,7 +131,6 @@ export default function DashboardPage() {
             return [a as Alert, ...prev].slice(0, 50);
         });
 
-        // Toast the alert (use wording based on state)
         const short = a.state === "triggered" ? "Triggered" : "Resolved";
         toast(`${short}: ${a.rule_id} (${a.api_id ?? "global"})`, {
             action: {
@@ -146,7 +138,6 @@ export default function DashboardPage() {
                 onClick: () => {
                     if (a.api_id) {
                         setSelectedApi(a.api_id);
-                        // don't re-fetch because SSE will push relevant events — but we can fetch initial snapshot
                         loadAlerts(a.api_id);
                         loadMetrics(a.api_id);
                     }
@@ -155,23 +146,29 @@ export default function DashboardPage() {
         });
     }, []);
 
-    // subscribe to SSE — use the absolute address or env-driven host
-    // your useSSE returns connection info and accepts handlers
-    useSSE(`${process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3000"}/v1/stream`, {
-        onMetric: handleIncomingMetric,
-        onAlert: handleIncomingAlert,
-    });
-
-    // ----------------------------------------------------
+    // subscribe/unsubscribe when component mounts/unmounts
+    useEffect(() => {
+        const unsubscribe = stream.subscribe({
+            onMetric: (m) => {
+                // optionally only accept metrics for current selectedApi (or accept all)
+                // if you only want metrics for selectedApi:
+                // if (m.api_id !== selectedApi) return;
+                handleIncomingMetric(m);
+            },
+            onAlert: (a) => {
+                // optionally only accept alerts for selectedApi
+                handleIncomingAlert(a);
+            },
+        });
+        return unsubscribe;
+    }, [stream, selectedApi, handleIncomingMetric, handleIncomingAlert]);
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">API Monitoring</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Uptime, latency & alerts — minimal dashboard
-                    </p>
+                    <p className="text-sm text-muted-foreground">Uptime, latency & alerts — minimal dashboard</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -181,7 +178,6 @@ export default function DashboardPage() {
                     <Button
                         onClick={() => {
                             if (selectedApi) {
-                                // allow manual refresh of snapshot if needed
                                 loadMetrics(selectedApi);
                                 loadAlerts(selectedApi);
                             }
@@ -227,9 +223,7 @@ export default function DashboardPage() {
                             </div>
                         </CardContent>
                         <CardFooter>
-                            <small className="text-muted-foreground">
-                                Manual probes call the server; SSE delivers the resulting metric.
-                            </small>
+                            <small className="text-muted-foreground">Manual probes call the server; SSE delivers the resulting metric.</small>
                         </CardFooter>
                     </Card>
 
@@ -240,9 +234,7 @@ export default function DashboardPage() {
                 <aside className="col-span-4 space-y-6">
                     <RuleManager api_id={selectedApi} />
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Alerts</CardTitle>
-                        </CardHeader>
+                        <CardHeader><CardTitle>Alerts</CardTitle></CardHeader>
                         <CardContent>
                             <AlertsList alerts={alerts} loading={loadingAlerts} />
                         </CardContent>
