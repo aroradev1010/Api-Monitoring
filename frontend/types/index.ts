@@ -25,6 +25,7 @@ export type Alert = {
   created_at: string;
   state: "triggered" | "resolved";
   payload?: any;
+  timestamp?: string;
 };
 
 export type Rule = {

@@ -7,6 +7,7 @@ import rulesRouter from "./routes/rules";
 import alertsRouter from "./routes/alerts";
 import errorHandler from "./middlewares/errorHandler";
 import probeRouter from "./routes/probe";
+import streamRouter from "./routes/stream";
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use("/v1/metrics", metricsRouter);
 app.use("/v1/rules", rulesRouter);
 app.use("/v1/alerts", alertsRouter);
 app.use("/v1/probe", probeRouter);
+app.use("/v1/stream", streamRouter);
 // Health check endpoint
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 

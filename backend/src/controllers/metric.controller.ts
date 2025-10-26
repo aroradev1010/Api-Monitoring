@@ -4,6 +4,7 @@ import Metric from "../models/metric.model";
 import Api from "../models/api.model";
 import logger from "../logger";
 import { evaluateRulesForMetric } from "../services/ruleEngine";
+import pubsub from "../services/pubsub";
 
 /**
  * ingestMetric: assumes request body was validated by route-level middleware
@@ -52,7 +53,13 @@ export async function ingestMetric(req: Request, res: Response) {
       tags: payload.tags ?? {},
     });
 
-    await metric.save();
+    const saved = await metric.save();
+    // Publish to pubsub for real-time streaming
+    try {
+      pubsub.emit("metric", saved.toObject());
+    } catch (e) {
+      logger.warn({ err: e }, "pubsub emit metric failed");
+    }
 
     // Fire-and-forget rule evaluation
     evaluateRulesForMetric(metric).catch((e) =>

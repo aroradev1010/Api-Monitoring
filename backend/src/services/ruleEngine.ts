@@ -3,6 +3,7 @@ import Alert from "../models/alert.model";
 import logger from "../logger";
 import { notifySlack } from "./notify";
 import { IMetric } from "../models/metric.model";
+import pubsub from "./pubsub";
 
 /**
  * Basic rule evaluation for Sprint 3.1.
@@ -49,7 +50,6 @@ async function evalRule(rule: IRule, metric: IMetric): Promise<EvalResult> {
  * - For each rule, evaluates and creates/resolves alerts accordingly.
  **/
 
-
 export async function evaluateRulesForMetric(metric: IMetric): Promise<void> {
   try {
     // load active rules that apply to this api or are global
@@ -81,7 +81,12 @@ export async function evaluateRulesForMetric(metric: IMetric): Promise<void> {
               reason: res.reason,
             },
           };
-          await Alert.create(payload);
+          const savedAlert = await Alert.create(payload);
+          try {
+            pubsub.emit("alert", savedAlert.toObject());
+          } catch (e) {
+            logger.warn({ err: e }, "pubsub emit alert failed");
+          }
           logger.info(
             { rule_id: rule.rule_id, api_id: metric.api_id },
             "Alert triggered"
