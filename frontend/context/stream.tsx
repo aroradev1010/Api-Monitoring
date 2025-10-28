@@ -1,90 +1,112 @@
 // src/context/stream.tsx
 "use client";
 
-import React, { createContext, useContext, useMemo, useRef, useState } from "react";
+import React, { createContext, useContext, useMemo, useRef, useCallback } from "react";
 import { useSSE } from "@/hooks/useSSE";
 
 type MetricPayload = any;
 type AlertPayload = any;
 
-export type StreamHandlers = {
+export type StreamSubscriber = {
     onMetric?: (m: MetricPayload) => void;
     onAlert?: (a: AlertPayload) => void;
 };
 
 export type StreamContextValue = {
     connected: boolean;
+    fallback: boolean;
     lastPing: number | null;
-    subscribe: (h: StreamHandlers) => () => void; // returns unsubscribe
+    reconnect: () => void;
+    close: () => void;
+    /**
+     * Subscribe to incoming events. Returns an unsubscribe function.
+     * Example:
+     *   const unsub = stream.subscribe({ onMetric: m => ... });
+     *   unsub(); // stop listening
+     */
+    subscribe: (s: StreamSubscriber) => () => void;
 };
 
 const StreamContext = createContext<StreamContextValue | null>(null);
 
-export function useStream() {
-    const ctx = useContext(StreamContext);
-    if (!ctx) throw new Error("useStream must be used within StreamProvider");
-    return ctx;
-}
+export function StreamProvider({
+    children,
+    url = "/v1/stream",
+}: {
+    children: React.ReactNode;
+    url?: string;
+}) {
+    // keep a stable ref of subscribers
+    const subscribersRef = useRef<Set<StreamSubscriber>>(new Set());
 
-export function StreamProvider({ children }: { children: React.ReactNode }) {
-    // subscribers stored in a Set for O(1) add/remove
-    const subsRef = useRef(new Set<StreamHandlers>());
-    const [lastPing, setLastPing] = useState<number | null>(null);
-    const [connected, setConnected] = useState(false);
-
-    // absolute backend base (allow env override); fallback to localhost:3000
-    const base = (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3000").replace(/\/$/, "");
-    const streamUrl = `${base}/v1/stream`;
-
-    // Handlers passed to useSSE will fan-out to subscribers
-    const sse = useSSE(streamUrl, {
-        onMetric: (m: MetricPayload) => {
-            // iterate subscribers and call onMetric
-            for (const s of subsRef.current) {
-                try {
-                    s.onMetric && s.onMetric(m);
-                } catch (err) {
-                    // swallow — a single bad subscriber shouldn't kill others
-                    // optionally log to console in dev
-                    // console.error("subscriber onMetric threw", err);
-                }
+    // publish helpers (stable references so useSSE callbacks can call them)
+    const publishMetric = useCallback((m: MetricPayload) => {
+        for (const s of subscribersRef.current) {
+            try {
+                s.onMetric?.(m);
+            } catch (err) {
+                // swallow to avoid breaking other subscribers
+                // optionally log
+                // console.error("subscriber onMetric error", err);
             }
-        },
-        onAlert: (a: AlertPayload) => {
-            for (const s of subsRef.current) {
-                try {
-                    s.onAlert && s.onAlert(a);
-                } catch (err) {
-                    // console.error("subscriber onAlert threw", err);
-                }
+        }
+    }, []);
+
+    const publishAlert = useCallback((a: AlertPayload) => {
+        for (const s of subscribersRef.current) {
+            try {
+                s.onAlert?.(a);
+            } catch (err) {
+                // console.error("subscriber onAlert error", err);
+            }
+        }
+    }, []);
+
+    // wire useSSE to publish into our subscribers set
+    const { connected, fallback, lastPing, reconnect, close } = useSSE({
+        url,
+        onMetric: publishMetric,
+        onAlert: publishAlert,
+        onFallback: (isFallback) => {
+            // optional: expose to analytics / logs
+            if (isFallback) {
+                // console.warn("SSE fallback active");
+            } else {
+                // console.info("SSE recovered");
             }
         },
     });
 
-    // map sse.connected/lastPing to provider state (so consumers can read reactive values)
-    // note: useSSE exposes connected/lastPing as values updated by the hook; here we update local state
-    React.useEffect(() => {
-        setConnected(sse.connected);
-    }, [sse.connected]);
-
-    React.useEffect(() => {
-        setLastPing(sse.lastPing ?? null);
-    }, [sse.lastPing]);
-
-    const subscribe = React.useCallback((h: StreamHandlers) => {
-        subsRef.current.add(h);
+    // subscribe API: add subscriber, return unsubscribe function
+    const subscribe = useCallback((s: StreamSubscriber) => {
+        subscribersRef.current.add(s);
+        let unsubbed = false;
         return () => {
-            subsRef.current.delete(h);
+            if (unsubbed) return;
+            subscribersRef.current.delete(s);
+            unsubbed = true;
         };
     }, []);
 
-    const value = useMemo<StreamContextValue>(() => {
-        return {
+    const value = useMemo<StreamContextValue>(
+        () => ({
             connected,
+            fallback,
             lastPing,
+            reconnect,
+            close,
             subscribe,
-        };
-    }, [connected, lastPing, subscribe]);
+        }),
+        [connected, fallback, lastPing, reconnect, close, subscribe]
+    );
 
     return <StreamContext.Provider value={value}>{children}</StreamContext.Provider>;
+}
+
+export function useStream(): StreamContextValue {
+    const ctx = useContext(StreamContext);
+    if (!ctx) {
+        throw new Error("useStream must be used inside StreamProvider");
+    }
+    return ctx;
 }

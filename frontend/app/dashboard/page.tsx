@@ -32,8 +32,9 @@ export default function DashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [probeBusy, setProbeBusy] = useState(false);
 
-    const stream = useStream(); // get subscribe(), connected, lastPing
-    const { lastPing } = stream;
+    // use top-level stream context
+    const stream = useStream();
+    const { fallback, connected, reconnect, lastPing } = stream;
 
     useEffect(() => {
         reloadApis();
@@ -108,61 +109,74 @@ export default function DashboardPage() {
         }
     }
 
-    // SSE subscription uses provider's subscribe API
-    const handleIncomingMetric = useCallback((m: Metric | any) => {
-        setMetrics((prev) => {
-            const key = `${m.api_id}:${m.timestamp ?? m.created_at ?? m._id ?? ""}`;
-            if (prev.length) {
-                const firstKey = `${prev[0].api_id}:${(prev[0] as any).timestamp ?? (prev[0] as any).created_at ?? (prev[0] as any)._id ?? ""}`;
-                if (firstKey === key) return prev;
-            }
-            return [m as Metric, ...prev].slice(0, 30);
-        });
+    // SSE handlers: update lists + toast
+    const handleIncomingMetric = useCallback(
+        (m: Metric | any) => {
+            setMetrics((prev) => {
+                const key = `${m.api_id}:${m.timestamp ?? m.created_at ?? m._id ?? ""}`;
+                if (prev.length) {
+                    const firstKey = `${prev[0].api_id}:${(prev[0] as any).timestamp ?? (prev[0] as any).created_at ?? (prev[0] as any)._id ?? ""}`;
+                    if (firstKey === key) return prev;
+                }
+                return [m as Metric, ...prev].slice(0, 30);
+            });
 
-        toast(`Metric: ${m.api_id} — ${m.latency_ms ?? "?"}ms (${m.status_code ?? "?"})`);
-    }, []);
+            toast(`Metric: ${m.api_id} — ${m.latency_ms ?? "?"}ms (${m.status_code ?? "?"})`);
+        },
+        [] // no dependencies that change identity frequently
+    );
 
-    const handleIncomingAlert = useCallback((a: Alert | any) => {
-        setAlerts((prev) => {
-            const id = (a as any)._id ?? `${a.rule_id}:${a.api_id}:${a.created_at ?? a.timestamp ?? Date.now()}`;
-            if (prev.length) {
-                const first = prev[0] as any;
-                const firstId = first._id ?? `${first.rule_id}:${first.api_id}:${first.created_at ?? first.timestamp ?? ""}`;
-                if (firstId === id) return prev;
-            }
-            return [a as Alert, ...prev].slice(0, 50);
-        });
+    const handleIncomingAlert = useCallback(
+        (a: Alert | any) => {
+            setAlerts((prev) => {
+                const id = (a as any)._id ?? `${a.rule_id}:${a.api_id}:${a.created_at ?? a.timestamp ?? Date.now()}`;
+                if (prev.length) {
+                    const first = prev[0] as any;
+                    const firstId = first._id ?? `${first.rule_id}:${first.api_id}:${first.created_at ?? first.timestamp ?? ""}`;
+                    if (firstId === id) return prev;
+                }
+                return [a as Alert, ...prev].slice(0, 50);
+            });
 
-        const short = a.state === "triggered" ? "Triggered" : "Resolved";
-        toast(`${short}: ${a.rule_id} (${a.api_id ?? "global"})`, {
-            action: {
-                label: "Open",
-                onClick: () => {
-                    if (a.api_id) {
-                        setSelectedApi(a.api_id);
-                        loadAlerts(a.api_id);
-                        loadMetrics(a.api_id);
-                    }
+            const short = a.state === "triggered" ? "Triggered" : "Resolved";
+            toast(`${short}: ${a.rule_id} (${a.api_id ?? "global"})`, {
+                action: {
+                    label: "Open",
+                    onClick: () => {
+                        if (a.api_id) {
+                            setSelectedApi(a.api_id);
+                            loadAlerts(a.api_id);
+                            loadMetrics(a.api_id);
+                        }
+                    },
                 },
-            },
-        });
-    }, []);
+            });
+        },
+        // loadAlerts/loadMetrics captured by reference from component scope; safe to omit here
+        []
+    );
 
     // subscribe/unsubscribe when component mounts/unmounts
     useEffect(() => {
+        // stream.subscribe should be implemented on your provider and return an unsubscribe function
+        // subscription may optionally accept filters (we pass everything and filter in handlers if needed)
         const unsubscribe = stream.subscribe({
-            onMetric: (m) => {
-                // optionally only accept metrics for current selectedApi (or accept all)
-                // if you only want metrics for selectedApi:
-                // if (m.api_id !== selectedApi) return;
+            onMetric: (m: any) => {
+                // if you want only metrics for selectedApi uncomment:
+                // if (selectedApi && m.api_id !== selectedApi) return;
                 handleIncomingMetric(m);
             },
-            onAlert: (a) => {
-                // optionally only accept alerts for selectedApi
+            onAlert: (a: any) => {
+                // optionally filter alerts by selectedApi
                 handleIncomingAlert(a);
             },
         });
-        return unsubscribe;
+
+        return () => {
+            try {
+                unsubscribe && unsubscribe();
+            } catch { }
+        };
     }, [stream, selectedApi, handleIncomingMetric, handleIncomingAlert]);
 
     return (
@@ -177,7 +191,10 @@ export default function DashboardPage() {
                     <Button variant="ghost" onClick={reloadApis} disabled={loadingApis}>
                         Reload APIs
                     </Button>
-                    <LastUpdated lastTs={lastPing} />
+
+                    {/* LastUpdated reads stream.lastPing */}
+                    <LastUpdated lastTs={lastPing ?? null} />
+
                     <Button
                         onClick={() => {
                             if (selectedApi) {
@@ -195,6 +212,25 @@ export default function DashboardPage() {
                 <Card>
                     <CardContent>
                         <div className="text-sm text-red-600">Error: {error}</div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {fallback && (
+                <Card>
+                    <CardContent>
+                        <div className="text-sm text-yellow-700">
+                            Live updates degraded — using polling fallback.{" "}
+                            <button
+                                className="underline ml-2"
+                                onClick={() => {
+                                    reconnect();
+                                    toast.success("Attempting to reconnect SSE...");
+                                }}
+                            >
+                                Retry SSE
+                            </button>
+                        </div>
                     </CardContent>
                 </Card>
             )}

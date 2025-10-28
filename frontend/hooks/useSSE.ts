@@ -1,123 +1,95 @@
-// src/hooks/useSSE.ts
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Handlers = {
+type UseSSEOptions = {
   onMetric?: (m: any) => void;
   onAlert?: (a: any) => void;
+  onPing?: (p: any) => void;
   onOpen?: () => void;
   onClose?: () => void;
+  onFallback?: (isFallback: boolean) => void;
+  url?: string;
+  // reconnect/backoff tuning
+  maxRetries?: number; // attempts before entering fallback
+  baseDelayMs?: number; // base for exponential backoff
+  maxDelayMs?: number; // cap
+  jitterMs?: number; // added/subtracted random jitter
+  pollingReconnectIntervalMs?: number; // while in fallback, try reconnect at this interval
 };
 
-export function useSSE(
-  url = "/v1/stream",
-  handlers: Handlers = {},
-  opts?: { pollInterval?: number; maxRetries?: number }
-) {
-  const { onMetric, onAlert, onOpen, onClose } = handlers;
-  const pollInterval = opts?.pollInterval ?? 5000;
-  const maxRetries = opts?.maxRetries ?? 6;
+export function useSSE(opts: UseSSEOptions = {}) {
+  const {
+    url = "/v1/stream",
+    onMetric,
+    onAlert,
+    onPing,
+    onOpen,
+    onClose,
+    onFallback,
+    maxRetries = 6,
+    baseDelayMs = 500, // 0.5s
+    maxDelayMs = 30000, // 30s
+    jitterMs = 200,
+    pollingReconnectIntervalMs = 30000, // try reconnect every 30s in fallback
+  } = opts;
 
   const [connected, setConnected] = useState(false);
-  const [lastPing, setLastPing] = useState<number | null>(null);
+  const [fallback, setFallback] = useState(false);
+  const lastPing = useRef<number | null>(null);
   const esRef = useRef<EventSource | null>(null);
-  const retryRef = useRef(0);
-  const pollRef = useRef<number | null>(null);
-  const stoppedRef = useRef(false);
+  const retryRef = useRef<number>(0);
+  const reconnectTimer = useRef<number | null>(null);
+  const pollingReconnectTimer = useRef<number | null>(null);
+  const closedByUserRef = useRef(false);
 
-  const supported = typeof window !== "undefined" && "EventSource" in window;
-
-  const startPolling = useCallback(
-    (pollUrl: string) => {
-      // simple fallback polling: GET /v1/stream/poll or metrics/alerts endpoints
-      // default pollUrl could be a combined endpoint but here we call /v1/stream?poll=1 -> backend can support
-      if (pollRef.current) return;
-      const id = window.setInterval(async () => {
-        try {
-          const res = await fetch(pollUrl, { cache: "no-store" });
-          if (!res.ok) return;
-          const data = await res.json();
-          // expected shape: { metrics?: [], alerts?: [], ping?: { t } }
-          if (data?.metrics && onMetric) {
-            for (const m of data.metrics) onMetric(m);
-          }
-          if (data?.alerts && onAlert) {
-            for (const a of data.alerts) onAlert(a);
-          }
-          if (data?.ping) {
-            setLastPing(Date.now());
-          }
-        } catch {
-          // ignore poll errors
-        }
-      }, pollInterval);
-      pollRef.current = id;
+  // helper: compute backoff with jitter
+  const computeDelay = useCallback(
+    (attempt: number) => {
+      const expo = Math.min(maxDelayMs, baseDelayMs * 2 ** attempt);
+      // jitter +/- jitterMs
+      const jitter = Math.floor(Math.random() * (jitterMs * 2 + 1)) - jitterMs;
+      return Math.max(0, expo + jitter);
     },
-    [onMetric, onAlert, pollInterval]
+    [baseDelayMs, maxDelayMs, jitterMs]
   );
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    stoppedRef.current = false;
-    if (!supported) {
-      // fallback to polling using explicit poll endpoint if you have it,
-      // otherwise you can poll the metrics/alerts endpoints separately.
-      startPolling(`${url}?poll=1`);
-      setConnected(false);
-      return () => {
-        stoppedRef.current = true;
-        stopPolling();
-      };
+  // open connection
+  const open = useCallback(() => {
+    // clear any fallback polling attempts
+    if (pollingReconnectTimer.current) {
+      window.clearInterval(pollingReconnectTimer.current);
+      pollingReconnectTimer.current = null;
     }
 
-    function connect() {
-      if (stoppedRef.current) return;
-      const es = new EventSource(url, { withCredentials: false } as any);
+    // don't open if user closed intentionally
+    if (closedByUserRef.current) return;
+
+    try {
+      const es = new EventSource(url);
       esRef.current = es;
 
-      es.onopen = () => {
+      es.addEventListener("open", () => {
         retryRef.current = 0;
+        setFallback(false);
         setConnected(true);
-        onOpen?.();
-        stopPolling(); // stop fallback if running
-      };
+        onOpen && onOpen();
+        onFallback && onFallback(false);
+      });
 
-      es.onerror = (e) => {
+      es.addEventListener("error", (ev: any) => {
+        // mark disconnected and attempt reconnect/backoff
         setConnected(false);
-        // close and schedule reconnect
-        try {
-          es.close();
-        } catch {}
-        // notify
-        onClose?.();
-
-        // backoff calculation
-        const attempt = ++retryRef.current;
-        if (attempt > maxRetries) {
-          // give up and enable polling fallback
-          startPolling(`${url}?poll=1`);
-          return;
-        }
-        const backoff = Math.min(1000 * 2 ** (attempt - 1), 30_000); // cap 30s
-        const jitter = Math.floor(Math.random() * 300);
-        const wait = backoff + jitter;
-        setTimeout(() => {
-          if (!stoppedRef.current) connect();
-        }, wait);
-      };
+        scheduleReconnect();
+      });
 
       es.addEventListener("ping", (ev: MessageEvent) => {
         try {
-          const p = JSON.parse(ev.data);
-          setLastPing(p?.t ? new Date(p.t).getTime() : Date.now());
+          const payload = JSON.parse(ev.data);
+          lastPing.current = payload?.t ?? Date.now();
+          onPing && onPing(payload);
         } catch {
-          setLastPing(Date.now());
+          lastPing.current = Date.now();
+          onPing && onPing({ t: Date.now() });
         }
       });
 
@@ -126,7 +98,7 @@ export function useSSE(
           const payload = JSON.parse(ev.data);
           onMetric && onMetric(payload);
         } catch {
-          // ignore
+          // ignore parse errors
         }
       });
 
@@ -135,67 +107,120 @@ export function useSSE(
           const payload = JSON.parse(ev.data);
           onAlert && onAlert(payload);
         } catch {
-          // ignore
+          // ignore parse errors
         }
       });
+
+      // also handle default message
+      es.onmessage = (ev: MessageEvent) => {
+        // no-op here — specialized listeners above handle events
+      };
+    } catch (err) {
+      // opening failed synchronously (e.g., EventSource not supported)
+      setConnected(false);
+      scheduleReconnect();
+    }
+  }, [url, onMetric, onAlert, onPing, onOpen, onFallback]);
+
+  // schedule reconnect with backoff
+  const scheduleReconnect = useCallback(() => {
+    if (closedByUserRef.current) return;
+    const attempt = retryRef.current ?? 0;
+
+    // if we've exceeded allowed attempts => enter fallback mode
+    if (attempt >= maxRetries) {
+      // enable fallback polling mode
+      setFallback(true);
+      onFallback && onFallback(true);
+
+      // try periodic reconnect attempts while in fallback (every pollingReconnectIntervalMs)
+      if (!pollingReconnectTimer.current) {
+        pollingReconnectTimer.current = window.setInterval(() => {
+          // reset counters and attempt to reconnect once
+          retryRef.current = 0;
+          open();
+        }, pollingReconnectIntervalMs);
+      }
+
+      return;
     }
 
-    connect();
+    const delay = computeDelay(attempt);
+    retryRef.current = attempt + 1;
 
-    return () => {
-      stoppedRef.current = true;
-      stopPolling();
+    // clear old timer if any
+    if (reconnectTimer.current) {
+      window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+
+    reconnectTimer.current = window.setTimeout(() => {
+      // ensure previous connection closed
       try {
         esRef.current?.close();
       } catch {}
       esRef.current = null;
-    };
-  }, [
-    url,
-    supported,
-    onMetric,
-    onAlert,
-    onOpen,
-    onClose,
-    startPolling,
-    stopPolling,
-    maxRetries,
-  ]);
+      open();
+    }, delay) as unknown as number; // window.setTimeout returns number in browser
+  }, [computeDelay, maxRetries, open, onFallback, pollingReconnectIntervalMs]);
 
-  // manual close/reconnect helpers
-  const close = () => {
-    stoppedRef.current = true;
-    try {
-      esRef.current?.close();
-    } catch {}
-    esRef.current = null;
-    stopPolling();
+  // close everything
+  const close = useCallback(() => {
+    closedByUserRef.current = true;
+    setFallback(false);
+    onFallback && onFallback(false);
     setConnected(false);
-  };
+    try {
+      if (reconnectTimer.current) {
+        window.clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+      if (pollingReconnectTimer.current) {
+        window.clearInterval(pollingReconnectTimer.current);
+        pollingReconnectTimer.current = null;
+      }
+      esRef.current?.close();
+      esRef.current = null;
+      onClose && onClose();
+    } catch {}
+  }, [onClose, onFallback]);
 
-  const reconnect = () => {
-    close();
-    stoppedRef.current = false;
+  // start once on mount
+  useEffect(() => {
+    closedByUserRef.current = false;
     retryRef.current = 0;
-    // will auto-reconnect via effect (re-run) if deps change, so call connect by toggling a ref
-    // simple approach: re-run effect by toggling a tiny state is overkill; instead create a new EventSource now:
-    // just call use effect's connect by creating one here — but to keep simple: reload page or create new EventSource
-    // For typical usage, prefer close() then create a fresh EventSource by toggling a key in parent.
-    // We'll just create a fresh ES here:
-    if (typeof window !== "undefined" && "EventSource" in window) {
-      const es = new EventSource(url);
-      esRef.current = es;
-    } else {
-      startPolling(`${url}?poll=1`);
-    }
-  };
+    open();
+
+    return () => {
+      // cleanup timers and es
+      try {
+        closedByUserRef.current = true;
+        if (reconnectTimer.current) {
+          window.clearTimeout(reconnectTimer.current);
+          reconnectTimer.current = null;
+        }
+        if (pollingReconnectTimer.current) {
+          window.clearInterval(pollingReconnectTimer.current);
+          pollingReconnectTimer.current = null;
+        }
+        esRef.current?.close();
+        esRef.current = null;
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
   return {
-    supported,
     connected,
-    lastPing,
+    fallback,
+    lastPing: lastPing.current,
     close,
-    reconnect,
-    forcePolling: () => startPolling(`${url}?poll=1`),
+    // explicit reconnect (reset counters and attempt)
+    reconnect: () => {
+      retryRef.current = 0;
+      setFallback(false);
+      onFallback && onFallback(false);
+      open();
+    },
   };
 }

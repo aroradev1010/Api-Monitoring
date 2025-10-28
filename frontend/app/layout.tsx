@@ -29,7 +29,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <StreamProvider>
+        <StreamProvider url={process.env.NEXT_PUBLIC_API_BASE ? `${process.env.NEXT_PUBLIC_API_BASE}/v1/stream` : "/v1/stream"}
+        >
           {children}
           <Toaster position="top-center" />
         </StreamProvider>
