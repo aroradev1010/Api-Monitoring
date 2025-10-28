@@ -19,6 +19,7 @@ import AlertsList from "@/components/AlertsList";
 import MetricsTable from "@/components/MetricsTable";
 import { useStream } from "@/context/stream";
 import { toast } from "sonner";
+import LastUpdated from "@/components/LastUpdated";
 
 export default function DashboardPage() {
     const [apis, setApis] = useState<Api[]>([]);
@@ -32,6 +33,7 @@ export default function DashboardPage() {
     const [probeBusy, setProbeBusy] = useState(false);
 
     const stream = useStream(); // get subscribe(), connected, lastPing
+    const { lastPing } = stream;
 
     useEffect(() => {
         reloadApis();
@@ -175,6 +177,7 @@ export default function DashboardPage() {
                     <Button variant="ghost" onClick={reloadApis} disabled={loadingApis}>
                         Reload APIs
                     </Button>
+                    <LastUpdated lastTs={lastPing} />
                     <Button
                         onClick={() => {
                             if (selectedApi) {

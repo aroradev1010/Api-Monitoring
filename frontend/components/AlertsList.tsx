@@ -2,9 +2,10 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/types";
+import AlertsListSkeleton from "./skeletons/AlertsListSkeleton";
 
 export default function AlertsList({ alerts, loading }: { alerts: Alert[]; loading?: boolean }) {
-    if (loading) return <div>Loading alerts...</div>;
+    if (loading) return <AlertsListSkeleton />;
     if (!alerts || alerts.length === 0) return <div className="text-sm text-muted-foreground">No alerts</div>;
 
     return (

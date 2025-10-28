@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import MetricsTableSkeleton from "./skeletons/MetricsTableSkeleton";
 
 export type Metric = {
     _id?: string;
@@ -19,7 +20,7 @@ type Props = {
 };
 
 export default function MetricsTable({ metrics = [], loading = false, limit = 100 }: Props) {
-    if (loading) return <div className="p-4">Loading metrics...</div>;
+    if (loading) return <MetricsTableSkeleton />;
     if (!metrics || metrics.length === 0) return <div className="p-4 text-sm text-muted-foreground">No metrics yet</div>;
 
     // show latest first (assumes timestamp is ISO string). Slice to the limit for safety.
