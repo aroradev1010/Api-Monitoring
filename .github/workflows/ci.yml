@@ -16,16 +16,18 @@ jobs:
         node-version: [18.x]
 
     steps:
-      # Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Setup Node with caching
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
+          # point to lockfiles inside the monorepo
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       # -----------------------------
       # 🔹 BACKEND TESTS
@@ -40,6 +42,13 @@ jobs:
         env:
           NODE_ENV: test
 
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
       # -----------------------------
       # 🔹 FRONTEND TESTS
       # -----------------------------
@@ -53,3 +62,10 @@ jobs:
         env:
           NODE_ENV: test
           CI: true
+
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
