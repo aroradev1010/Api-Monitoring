@@ -8,30 +8,64 @@ on:
 
 jobs:
   test:
-    name: Run backend tests
+    name: Run backend & frontend tests
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         node-version: [18.x]
 
     steps:
+      # Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Setup Node with caching
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
-          # Tell setup-node where the lockfile for caching lives
-          cache-dependency-path: backend/package-lock.json
 
+      # -----------------------------
+      # 🔹 BACKEND TESTS
+      # -----------------------------
       - name: Install dependencies (backend)
         run: npm ci
         working-directory: backend
 
-      - name: Run tests (with coverage)
+      - name: Run backend tests (with coverage)
         run: npm test -- --coverage
         working-directory: backend
         env:
           NODE_ENV: test
+
+      # Upload backend coverage artifact (optional)
+      - name: Upload backend coverage
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+      # -----------------------------
+      # 🔹 FRONTEND TESTS
+      # -----------------------------
+      - name: Install dependencies (frontend)
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run frontend tests (with coverage)
+        run: npm test -- --coverage
+        working-directory: frontend
+        env:
+          NODE_ENV: test
+          CI: true
+
+      # Upload frontend coverage artifact (optional)
+      - name: Upload frontend coverage
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
