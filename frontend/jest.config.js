@@ -1,12 +1,20 @@
-/** @type {import('jest').Config} */
-const config = {
-  testEnvironment: "jsdom",
+// frontend/jest.config.js
+module.exports = {
   preset: "ts-jest",
-  testMatch: ["**/__tests__/**/*.(test|spec).[jt]s?(x)"],
+  testEnvironment: "jsdom",
+  roots: ["<rootDir>"],
+  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
+  transform: {
+    "^.+\\.(t|j)sx?$": "ts-jest",
+  },
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/app/$1", // so @/context/stream etc work
+    "^@/(.*)$": "<rootDir>/$1",
+    "^@/components/(.*)$": "<rootDir>/components/$1",
+    "^@/hooks/(.*)$": "<rootDir>/hooks/$1",
+    "^@/context/(.*)$": "<rootDir>/context/$1",
+    "^@/services/(.*)$": "<rootDir>/services/$1",
+    "^@/types$": "<rootDir>/types",
+    "^.+\\.(css|less|sass|scss)$": "identity-obj-proxy",
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
 };
-
-module.exports = config;

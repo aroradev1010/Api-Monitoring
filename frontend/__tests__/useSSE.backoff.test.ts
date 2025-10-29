@@ -2,7 +2,7 @@
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom";
 import { createRoot, Root } from "react-dom/client";
-import { act } from "react-dom/test-utils";
+import { act } from "react";
 
 jest.useFakeTimers();
 

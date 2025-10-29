@@ -108,7 +108,7 @@ export default function RuleManager({ api_id }: { api_id?: string }) {
                     <div>Loading rules...</div>
                 ) : (
                     <ul className="space-y-2">
-                        {rules.map((r) => (
+                            {(rules ?? []).map((r) => (
                             <li key={r.rule_id} className="flex items-center justify-between">
                                 <div>
                                     <div className="font-medium">{r.name}</div>
