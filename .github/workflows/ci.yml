@@ -40,14 +40,6 @@ jobs:
         env:
           NODE_ENV: test
 
-      # Upload backend coverage artifact (optional)
-      - name: Upload backend coverage
-        if: success() || failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-coverage
-          path: backend/coverage
-
       # -----------------------------
       # 🔹 FRONTEND TESTS
       # -----------------------------
@@ -61,11 +53,3 @@ jobs:
         env:
           NODE_ENV: test
           CI: true
-
-      # Upload frontend coverage artifact (optional)
-      - name: Upload frontend coverage
-        if: success() || failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-coverage
-          path: frontend/coverage
