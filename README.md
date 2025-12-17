@@ -1,256 +1,139 @@
-# Intelligent API Performance Monitoring System
+<p align="center">
+  <img src="screenshots/banner.png" alt="API Monitoring Dashboard" width="100%">
+</p>
 
-A real-time API monitoring platform that tracks uptime, latency, and errors for registered APIs. Includes a probe agent, metrics ingestion backend, rule-based alerting engine, and DevOps-ready deployment with Docker and CI/CD.
+# 📊 API Monitoring Dashboard
 
----
+A **production-grade, real-time API monitoring system** built with Next.js, Node.js, and MongoDB. This dashboard is designed to stream live metrics and alerts with high resilience, testing discipline, and architectural scalability.
 
-## Table of Contents
 
-- [Overview](#overview)  
-- [Features](#features)  
-- [System Architecture](#system-architecture)  
-- [Tech Stack](#tech-stack)  
-- [Project Structure](#project-structure)  
-- [Prerequisites](#prerequisites)  
-- [Setup and Running Locally](#setup-and-running-locally)  
-- [Docker Deployment](#docker-deployment)  
-- [API Endpoints](#api-endpoints)  
-- [Testing and CI](#testing-and-ci)  
-- [Future Improvements](#future-improvements)  
-- [Author](#author)  
-- [License](#license)
+
+
 
 ---
 
-## Overview
+## 🚀 Why This Project Stands Out
 
-Modern applications rely on APIs for authentication, payments, order processing, and third-party integrations. Failures or increased latency in these APIs can cause significant business disruption.
+Unlike basic CRUD applications, this system focuses on **real-time data integrity** and **fault tolerance**:
 
-This project provides a monitoring platform that:
-
-- Continuously probes registered APIs and measures latency and status codes,
-- Stores metrics in MongoDB,
-- Evaluates metrics against rules to detect anomalies,
-- Emits alerts when performance degrades.
-
-It is designed as an educational but production-minded system for learning full-stack and DevOps practices.
+* **Real-Time Streaming:** Uses **Server-Sent Events (SSE)** for efficient, low-overhead data delivery.
+* **Graceful Degradation:** Features an automatic **fallback to polling** if SSE connections fail, ensuring zero data gaps.
+* **Resilience:** Implements automatic reconnect logic with **exponential backoff**.
+* **Testing Discipline:** Comprehensive coverage including **Unit**, **Integration**, and **E2E (Playwright)** tests.
+* **Agile Methodology:** Developed in iterative sprints with a focus on CI/CD and production-readiness.
 
 ---
 
-## Features
+## 🛠 Tech Stack
 
-- API registration and metadata management  
-- Probe agent for periodic checks and metric reporting  
-- Metrics ingestion service with persistence (MongoDB)  
-- Rule evaluation engine (prototype) and alert manager (skeleton)  
-- Healthcheck endpoint for container orchestration and monitoring  
-- Dockerized backend and MongoDB for reproducible deployments  
-- Automated tests (Jest + Supertest) with in-memory MongoDB for CI
+### Frontend
+* **Framework:** Next.js 14+ (App Router)
+* **Styling:** Tailwind CSS & shadcn/ui
+* **State & Notifications:** React Context API & Sonner (Toasts)
 
----
+### Backend
+* **Runtime:** Node.js & Express.js
+* **Database:** MongoDB (via Mongoose)
+* **Streaming:** Server-Sent Events (SSE)
 
-## System Architecture
-
-The simplified architecture is:
-
-```mermaid
-flowchart LR
-  subgraph Probe
-    P[Probe Agent] -->|POST metrics| Backend[/Backend Ingest/]
-  end
-
-  subgraph Backend
-    Backend --> DB[(MongoDB)]
-    Backend --> RE[Rule Engine]
-    RE --> AM[Alert Manager]
-    AM --> Alerts[(Alerts DB)]
-  end
-
-  subgraph Frontend
-    Dashboard[React Dashboard] -->|GET metrics| Backend
-  end
-```
+### DevOps & Testing
+* **Unit Testing:** Jest & React Testing Library
+* **E2E Testing:** Playwright
+* **CI/CD:** GitHub Actions
+* **Containerization:** Docker
 
 ---
 
-## Tech Stack
+## 📈 System Architecture & Flow
 
-**Backend**
-- Node.js + Express
-- TypeScript
-- MongoDB + Mongoose
-- Joi (validation)
-- Pino (logging)
+The system is built to handle the lifecycle of an API request from probe to visualization:
 
-**Probe**
-- Node.js + Axios
+1.  **Management:** Users define APIs and Alert Rules (e.g., "Alert if latency > 500ms").
+2.  **Streaming:** The backend pushes updates via an SSE stream.
+3.  **Resilience Logic:** * The Frontend attempts an SSE connection.
+    * If the connection drops, it attempts to reconnect.
+    * If reconnection fails after $X$ attempts, it switches to **HTTP Polling** automatically.
 
-**Frontend (planned)**
-- React + TailwindCSS or Material-UI
-- Axios for API calls
 
-**DevOps & Testing**
-- Docker & Docker Compose
-- GitHub Actions (CI)
-- Jest + Supertest
-- mongodb-memory-server (test DB)
 
 ---
 
-## Project Structure
+## 📋 Core Features
 
-```
-api-monitoring/
-│
-├── backend/
-│   ├── src/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── middlewares/
-│   │   └── index.ts
-│   ├── package.json
-│   ├── Dockerfile
-│   └── jest.config.ts
-│
-├── probe/
-│   └── probe.js
-│
-├── frontend/
-│   ├── src/
-│   └── package.json
-│
-├── docker-compose.yml
-├── .github/workflows/ci.yml
-└── README.md
-```
+| Feature | Description |
+| :--- | :--- |
+| **Live Metrics** | Monitor latency, status codes, and uptime in real-time. |
+| **Smart Alerting** | Define custom rules for latency thresholds and error conditions. |
+| **Resilient UI** | Visual indicators for "Live" vs "Degraded (Polling)" connection states. |
+| **API Management** | Full CRUD interface for managing monitored endpoints. |
+| **Automated CI** | Every push is validated through a suite of automated tests. |
 
 ---
 
-## Prerequisites
+## 🧪 Testing Strategy
 
-- Node.js 18 or later  
-- npm  
-- Docker & Docker Compose (for containerized run)  
-- Git
+The project maintains a high bar for code quality through a multi-tiered testing approach:
+
+* **Unit Tests:** Validating frontend hooks and backend service logic.
+* **E2E Tests (Playwright):** Simulating real user flows, including:
+    * Dashboard loading and stream verification.
+    * Manual probe triggering to verify real-time UI updates.
+    * Simulating SSE failures to test fallback mechanisms.
 
 ---
 
-## Setup and Running Locally
+## Screenshots
 
-1. Clone repository:
+
+![Dashboard](./screenshots/dashboard.png)
+
+---
+
+## ⚙️ Installation & Setup
+
+### Prerequisites
+* Node.js 18+
+* MongoDB (Local or Atlas)
+
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/Api-Monitoring.git
-cd Api-Monitoring
+git clone [https://github.com/yourusername/api-monitoring-dashboard.git](https://github.com/yourusername/api-monitoring-dashboard.git)
+cd api-monitoring-dashboard
 ```
 
-2. Backend (development):
+## Backend Setup
+
 ```bash
 cd backend
 npm install
+
+# Create a .env file with the following values
+MONGODB_URI=your_mongodb_uri
+PORT=3000
+
 npm run dev
-```
-The backend server will be available at: `http://localhost:3000`
 
-3. Frontend (optional, if implemented):
+```
+
+## Frontend Setup
+
 ```bash
-cd ../frontend
+cd frontend
 npm install
-npm start
-```
-The frontend will be available at: `http://localhost:3001` (default)
 
-4. Probe agent:
-```bash
-cd ../probe
-node probe.js
-```
-By default the probe sends metrics to `http://localhost:3000/v1/metrics`. Adjust environment variables (TARGET, API_ID, INGEST_URL) as needed.
+# Create a .env.local file with the following value
+NEXT_PUBLIC_API_BASE=http://localhost:3000
 
----
+npm run dev
 
-## Docker Deployment
-
-From the repository root (where `docker-compose.yml` is located):
-
-1. Build and start services:
-```bash
-docker-compose up --build
 ```
 
-This command will build the backend image and start containers for backend and MongoDB.
+## Future Enhancements
 
-2. Stop and remove containers:
-```bash
-docker-compose down
-```
+- [ ] **Authentication** – Integration of Auth.js (NextAuth) for protected routes.
+- [ ] **Data Visualization** – Historical metrics and trend analysis using Recharts.
+- [ ] **Advanced Alerting** – Slack and Discord webhook integrations.
+- [ ] **Dark Mode** – Native light/dark theme switching.
 
-Notes:
-- The Docker Compose setup maps backend port 3000 from the container to host port 3000.
-- Docker healthcheck is recommended for the backend service to ensure automatic restarts on failures.
 
----
 
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST   | `/v1/apis` | Register a new API |
-| GET    | `/v1/apis` | List registered APIs |
-| POST   | `/v1/metrics` | Ingest a metric from probe |
-| GET    | `/v1/metrics?api_id=<id>&limit=<n>` | Retrieve metrics for an API |
-| GET    | `/health` | Health check endpoint |
-
-Example: register an API
-```bash
-curl -X POST http://localhost:3000/v1/apis   -H "Content-Type: application/json"   -d '{"api_id":"demo-api","name":"Demo API","base_url":"https://httpbin.org/delay/0","probe_interval":30,"expected_status":[200]}'
-```
-
----
-
-## Testing and CI
-
-### Local tests
-From the `backend` directory:
-```bash
-npm test
-```
-
-To run tests with coverage reporting:
-```bash
-npm test -- --coverage
-```
-This will generate a `coverage/` folder summarizing line/branch/function coverage.
-
-### Continuous Integration
-A GitHub Actions workflow is configured (`.github/workflows/ci.yml`) to run backend tests on push and pull requests. The CI job executes tests in the `backend` directory using Node 18 and reports failures on PRs.
-
----
-
-## Future Improvements
-
-Planned enhancements:
-- Implement full rule engine with time windows and anomaly detection
-- Slack and email alert integrations
-- Grafana dashboards and Prometheus metrics exporter
-- Frontend dashboard for visualizing metrics and alerts
-- Kubernetes manifests and Helm charts for production deployment
-- Role-based access control (OAuth2/JWT)
-
----
-
-## Author
-
-Dev Arora  
-Software Engineering Student | Full Stack & DevOps Enthusiast
-
-- GitHub: https://github.com/<your-username>  
-- LinkedIn: https://linkedin.com/in/<your-handle>
-
-Replace `<your-username>` and `<your-handle>` with your actual handles before publishing.
-
----
-
-## License
-
-This project is released under the MIT License. Feel free to use and modify for learning and research.
