@@ -20,7 +20,7 @@ import MetricsTable from "@/components/MetricsTable";
 import { useStream } from "@/context/stream";
 import { toast } from "sonner";
 import LastUpdated from "@/components/LastUpdated";
-
+import { Activity, RefreshCw, Loader2, Play, Info, BellRing } from "lucide-react";
 export default function DashboardPage() {
     const [apis, setApis] = useState<Api[]>([]);
     const [selectedApi, setSelectedApi] = useState<string>("");
@@ -238,31 +238,41 @@ export default function DashboardPage() {
             <div className="grid grid-cols-12 gap-6">
                 {/* Left column */}
                 <div className="col-span-8 space-y-6">
-                    <Card>
-                        <CardHeader className="flex items-center justify-between">
-                            <CardTitle>APIs</CardTitle>
+                    <Card className="border-border shadow-sm overflow-hidden">
+                        <CardHeader className="bg-muted/30 pb-4 border-b flex sm:flex-row flex-col items-start sm:items-center justify-between gap-4 space-y-0">
                             <div className="flex items-center gap-2">
-                                <ApiSelector apis={apis} selectedApi={selectedApi} onChange={setSelectedApi} loading={loadingApis} />
-                                <Button size="sm" onClick={() => { if (selectedApi) { loadMetrics(selectedApi); loadAlerts(selectedApi); } }}>
-                                    Reload
+                                <Activity className="w-5 h-5 text-primary" />
+                                <div>
+                                    <CardTitle className="text-lg">API Performance Hub</CardTitle>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Select an API to view its real-time telemetry</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <div className="flex-1 sm:flex-none max-w-[200px]">
+                                    <ApiSelector apis={apis} selectedApi={selectedApi} onChange={setSelectedApi} loading={loadingApis} />
+                                </div>
+                                <Button size="icon" variant="outline" className="h-9 w-9 shrink-0 hover:bg-primary/5 hover:text-primary transition-colors border-border/60 hover:border-primary/30" onClick={() => { if (selectedApi) { loadMetrics(selectedApi); loadAlerts(selectedApi); } }} title="Reload Data">
+                                    <RefreshCw className="w-4 h-4" />
                                 </Button>
                             </div>
                         </CardHeader>
 
-                        <CardContent>
-                            <div className="flex items-center gap-3 mb-3">
-                                <Button onClick={runManualProbe} disabled={probeBusy || !selectedApi}>
-                                    {probeBusy ? "Running..." : "Run Manual Probe"}
+                        <CardContent className="pt-6">
+                            <div className="flex sm:flex-row flex-col items-start sm:items-center justify-between mb-5 gap-3">
+                                <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                                    Recent Probe Metrics
+                                </h3>
+                                <Button size="sm" onClick={runManualProbe} disabled={probeBusy || !selectedApi} className="shadow-sm w-full sm:w-auto transition-all h-8">
+                                    {probeBusy ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-2" />}
+                                    {probeBusy ? "Running Probe..." : "Run Manual Probe"}
                                 </Button>
                             </div>
 
-                            <div>
-                                <h3 className="font-medium mb-2">Recent Metrics</h3>
-                                <MetricsTable metrics={metrics} loading={loadingMetrics} />
-                            </div>
+                            <MetricsTable metrics={metrics} loading={loadingMetrics} />
                         </CardContent>
-                        <CardFooter>
-                            <small className="text-muted-foreground">Manual probes call the server; SSE delivers the resulting metric.</small>
+                        <CardFooter className="bg-muted/20 border-t py-2.5 px-6">
+                            <small className="text-muted-foreground flex items-center gap-1.5"><Info className="w-3.5 h-3.5 shrink-0" /> Manual probes contact the server immediately. Data is delivered via low-latency SSE.</small>
                         </CardFooter>
                     </Card>
 
@@ -272,9 +282,17 @@ export default function DashboardPage() {
                 {/* Right column */}
                 <aside className="col-span-4 space-y-6">
                     <RuleManager api_id={selectedApi} />
-                    <Card>
-                        <CardHeader><CardTitle>Alerts</CardTitle></CardHeader>
-                        <CardContent>
+                    <Card className="border-border shadow-sm">
+                        <CardHeader className="bg-muted/30 pb-4 border-b">
+                            <div className="flex items-center gap-2">
+                                <BellRing className="w-5 h-5 text-primary" />
+                                <div>
+                                    <CardTitle className="text-lg">Recent Alerts</CardTitle>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Status changes and triggered rules</p>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-6">
                             <AlertsList alerts={alerts} loading={loadingAlerts} />
                         </CardContent>
                     </Card>

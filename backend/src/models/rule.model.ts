@@ -1,9 +1,9 @@
 import mongoose, { Document, Schema, Model } from "mongoose";
 
-export type RuleType = "latency_gt" | "status_not_in"; // simple rule types
+export type RuleType = "latency_gt" | "status_not_in"; 
 
 export interface IRule extends Document {
-  rule_id: string; // unique string id (human-friendly)
+  rule_id: string; 
   name: string;
   api_id?: string | null; // if null -> applies to all APIs
   type: RuleType;

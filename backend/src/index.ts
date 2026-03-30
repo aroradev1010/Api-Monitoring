@@ -1,7 +1,7 @@
 import config from "./config";
 import { connectDB } from "./services/db";
 import logger from "./logger";
-import app from "./app"; // <-- import your new Express app
+import app from "./app";
 
 const port = config.PORT;
 
