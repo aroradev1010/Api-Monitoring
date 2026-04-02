@@ -2,17 +2,23 @@
 require("dotenv").config();
 const axios = require("axios");
 
-const INGEST_URL = process.env.INGEST_URL || "http://localhost:3000/v1/metrics";
+const INGEST_URL = process.env.INGEST_URL || "http://localhost:3000/v1/events";
 const API_ID = process.env.API_ID || "demo-api";
 const TARGET = process.env.TARGET || "https://httpbin.org/delay/0";
-const INTERVAL_MS = parseInt(process.env.PROBE_INTERVAL_MS || "3000", 10); // default 30s
+const INTERVAL_MS = parseInt(process.env.PROBE_INTERVAL_MS || "3000", 10);
 const POST_RETRIES = parseInt(process.env.POST_RETRIES || "3", 10);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function postMetric(payload) {
+function deriveStatus(statusCode, errorType) {
+  if (errorType === "timeout") return "timeout";
+  if (statusCode >= 500) return "error";
+  return "ok";
+}
+
+async function postEvent(payload) {
   let attempt = 0;
   let backoff = 500; // ms
   while (attempt <= POST_RETRIES) {
@@ -39,38 +45,69 @@ async function postMetric(payload) {
 async function probeOnce() {
   const start = Date.now();
   let payload;
+
+  let parsedPath = "/";
+  try { parsedPath = new URL(TARGET).pathname; } catch {}
+
   try {
     const res = await axios.get(TARGET, { timeout: 15000 });
     const latency = Date.now() - start;
     payload = {
-      api_id: API_ID,
-      timestamp: new Date(),
+      service: API_ID,
+      kind: "http_request",
+      operation: TARGET,
+      status: "ok",
       latency_ms: latency,
-      status_code: res.status,
-      error: null,
+      error_code: null,
+      error_message: null,
+      started_at: new Date(start).toISOString(),
+      ended_at: new Date(start + latency).toISOString(),
+      http: {
+        method: "GET",
+        path: parsedPath,
+        status_code: res.status,
+        target_url: TARGET,
+      },
       tags: { target: TARGET },
+      api_key: "default",
     };
   } catch (err) {
     const latency = Date.now() - start;
+    const statusCode = err.response ? err.response.status : 0;
+    let errorType = "network";
+    if (err.code === "ECONNABORTED") errorType = "timeout";
+    else if (err.response) errorType = "http_error";
+
     payload = {
-      api_id: API_ID,
-      timestamp: new Date(),
+      service: API_ID,
+      kind: "http_request",
+      operation: TARGET,
+      status: deriveStatus(statusCode, errorType),
       latency_ms: latency,
-      status_code: err.response ? err.response.status : 0,
-      error: err.message,
+      error_code: errorType !== "none" ? errorType.toUpperCase() : null,
+      error_message: err.message,
+      started_at: new Date(start).toISOString(),
+      ended_at: new Date(start + latency).toISOString(),
+      http: {
+        method: "GET",
+        path: parsedPath,
+        status_code: statusCode,
+        target_url: TARGET,
+      },
       tags: { target: TARGET },
+      api_key: "default",
     };
   }
 
-  const ok = await postMetric(payload);
+  const ok = await postEvent(payload);
   if (ok) {
-    console.log("[probe] sent metric", {
-      api_id: payload.api_id,
+    console.log("[probe] sent event", {
+      service: payload.service,
       latency_ms: payload.latency_ms,
-      status_code: payload.status_code,
+      status: payload.status,
     });
   } else {
-    console.error("[probe] failed to send metric after retries", payload);
+    console.error("[probe] failed to send event after retries", payload);
   }
 }
 

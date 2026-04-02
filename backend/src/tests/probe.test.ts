@@ -37,18 +37,20 @@ describe("Probe endpoint", () => {
     mockedAxios.get.mockResolvedValueOnce({ status: 200, data: {} } as any);
 
     // mock axios.post to ingest endpoint success
-    // cast to any to satisfy AxiosResponse typing in tests
     mockedAxios.post.mockResolvedValueOnce({ status: 202, data: {} } as any);
 
     const res = await request(app).post("/v1/probe/probe-api").send();
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("metric");
-    expect(res.body.metric.api_id).toBe("probe-api");
+    expect(res.body).toHaveProperty("event");
+    expect(res.body.event.service).toBe("probe-api");
+    expect(res.body.event.kind).toBe("http_request");
 
     // axios.get called with target
     expect(mockedAxios.get).toHaveBeenCalled();
-    // axios.post forwarded to ingest
+    // axios.post forwarded to ingest (now /v1/events)
     expect(mockedAxios.post).toHaveBeenCalled();
+    const postCallUrl = mockedAxios.post.mock.calls[0][0];
+    expect(postCallUrl).toContain("/v1/events");
   });
 
   test("POST /v1/probe/:api_id - forward to ingest fails (return indicates warn)", async () => {
@@ -66,16 +68,14 @@ describe("Probe endpoint", () => {
     // simulate successful target get
     mockedAxios.get.mockResolvedValueOnce({ status: 200, data: {} } as any);
 
-    // simulate ingest failure (axios.post throws an AxiosError-like object)
+    // simulate ingest failure
     const err = new Error("Bad request");
-    // attach structure similar to axios error (status 400)
     (err as any).response = { status: 400, data: { error: "bad" } };
     mockedAxios.post.mockRejectedValueOnce(err);
 
     const res = await request(app).post("/v1/probe/probe-api-fail").send();
-    // probe returns 502 with metric + warn in body (as implemented)
     expect(res.status).toBe(502);
-    expect(res.body).toHaveProperty("metric");
+    expect(res.body).toHaveProperty("event");
     expect(res.body).toHaveProperty("warn");
     expect(res.body.warn).toMatch(/failed to forward/i);
   });

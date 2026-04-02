@@ -16,7 +16,7 @@ describe("SSE /v1/stream (integration)", () => {
     }
   });
 
-  test("SSE client receives published metric events (via emitter)", async () => {
+  test("SSE client receives published event (via emitter)", async () => {
     // start server on ephemeral port
     server = app.listen(0);
     const addr = server.address();
@@ -28,8 +28,8 @@ describe("SSE /v1/stream (integration)", () => {
     const port = addr.port;
     const url = `http://127.0.0.1:${port}/v1/stream`;
 
-    // Create EventSource client and wait for a metric event
-    const gotMetric = new Promise<void>((resolve, reject) => {
+    // Create EventSource client and wait for an event
+    const gotEvent = new Promise<void>((resolve, reject) => {
       let es: any;
       let safety: NodeJS.Timeout | null = null;
 
@@ -50,16 +50,18 @@ describe("SSE /v1/stream (integration)", () => {
         }
       };
 
-      // If connection opens, publish a metric into the same in-process pubsub
+      // If connection opens, publish an event into the same in-process pubsub
       es.onopen = () => {
         // small delay to ensure server-side subscription is attached
         setTimeout(() => {
           try {
-            (pubsub as any).emit("metric", {
-              api_id: "sse-integ-api",
+            (pubsub as any).emit("event", {
+              service: "sse-integ-api",
               latency_ms: 7,
-              timestamp: new Date().toISOString(),
-              status_code: 200,
+              started_at: new Date().toISOString(),
+              kind: "http_request",
+              status: "ok",
+              http: { status_code: 200, method: "GET", path: "/", target_url: "https://example.com" },
             });
           } catch (e) {
             cleanup();
@@ -69,10 +71,10 @@ describe("SSE /v1/stream (integration)", () => {
       };
 
       es.onerror = (e: any) => {
-        // don't reject on first error — wait for metric or timeout
+        // don't reject on first error — wait for event or timeout
       };
 
-      es.addEventListener("metric", (ev: any) => {
+      es.addEventListener("event", (ev: any) => {
         try {
           const payload = JSON.parse(ev.data);
           if (!payload) {
@@ -80,10 +82,10 @@ describe("SSE /v1/stream (integration)", () => {
             reject(new Error("Empty payload"));
             return;
           }
-          if (payload.api_id !== "sse-integ-api") {
+          if (payload.service !== "sse-integ-api") {
             cleanup();
             reject(
-              new Error("Unexpected api_id in SSE payload: " + payload.api_id)
+              new Error("Unexpected service in SSE payload: " + payload.service)
             );
             return;
           }
@@ -100,13 +102,13 @@ describe("SSE /v1/stream (integration)", () => {
         try {
           es?.close();
         } catch {}
-        reject(new Error("Timed out waiting for SSE metric event"));
+        reject(new Error("Timed out waiting for SSE event"));
       }, 8000);
     });
 
     // await the promise (will reject on failure)
     try {
-      await gotMetric;
+      await gotEvent;
     } finally {
       if (server) {
         await new Promise<void>((res) => server!.close(() => res()));

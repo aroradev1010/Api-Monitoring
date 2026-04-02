@@ -9,25 +9,24 @@ describe("pubsub (unit) - EventEmitter style", () => {
   test("on/emit receives published payload", async () => {
     const received: any[] = [];
 
-    // use the actual emitter API (.on / .off / .emit)
     const handler = (p: any) => {
       received.push(p);
     };
-    (pubsub as any).on("metric", handler);
+    (pubsub as any).on("event", handler);
 
     // emit a couple messages
-    (pubsub as any).emit("metric", { api_id: "u1", latency_ms: 10 });
-    (pubsub as any).emit("metric", { api_id: "u2", latency_ms: 20 });
+    (pubsub as any).emit("event", { service: "u1", latency_ms: 10 });
+    (pubsub as any).emit("event", { service: "u2", latency_ms: 20 });
 
     // small delay to allow any async handlers to run (most emit is sync)
     await new Promise((r) => setTimeout(r, 10));
 
     expect(received.length).toBeGreaterThanOrEqual(2);
-    expect(received[0]).toMatchObject({ api_id: "u1", latency_ms: 10 });
-    expect(received[1]).toMatchObject({ api_id: "u2", latency_ms: 20 });
+    expect(received[0]).toMatchObject({ service: "u1", latency_ms: 10 });
+    expect(received[1]).toMatchObject({ service: "u2", latency_ms: 20 });
 
     // cleanup
-    (pubsub as any).off("metric", handler);
+    (pubsub as any).off("event", handler);
   });
 
   test("off stops receiving events", async () => {

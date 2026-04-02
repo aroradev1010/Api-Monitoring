@@ -21,70 +21,96 @@ export async function runProbe(req: Request, res: Response) {
     const timeout = Number(req.body.timeout ?? 10000); // ms, can be overridden
 
     const start = Date.now();
-    let status_code = 0;
+    let httpStatusCode = 0;
     let error: string | null = null;
-    let error_type: "none" | "timeout" | "network" | "http_error" = "none";
+    let errorType: "none" | "timeout" | "network" | "http_error" = "none";
 
     try {
       const r = await axios.get(target, { timeout });
-      status_code = r.status ?? 0;
+      httpStatusCode = r.status ?? 0;
       error = null;
-      error_type = "none";
+      errorType = "none";
     } catch (e: unknown) {
-      // Use runtime checks instead of depending on named types that might not exist
       const err = e as any;
 
-      // Axios uses code === 'ECONNABORTED' for timeouts
       if (err?.code === "ECONNABORTED") {
-        error_type = "timeout";
+        errorType = "timeout";
       } else if (err?.response && typeof err.response.status === "number") {
-        // HTTP error (server responded with non-2xx)
-        error_type = "http_error";
-        status_code = err.response.status ?? 0;
+        errorType = "http_error";
+        httpStatusCode = err.response.status ?? 0;
       } else {
-        // Network/DNS/refused etc.
-        error_type = "network";
+        errorType = "network";
       }
 
-      // Friendly error message
       error = err?.message ? String(err.message) : String(err);
     }
 
     const latency = Date.now() - start;
+    const startedAt = new Date(start);
+    const endedAt = new Date(start + latency);
 
-    const metricPayload = {
-      api_id: api.api_id,
-      timestamp: new Date().toISOString(),
+    // Derive event status per decision doc mapping
+    let status: "ok" | "error" | "timeout";
+    if (errorType === "timeout") {
+      status = "timeout";
+    } else if (httpStatusCode >= 500) {
+      status = "error";
+    } else {
+      status = "ok";
+    }
+
+    const errorCode = errorType !== "none" ? errorType.toUpperCase() : null;
+
+    let parsedPath = "/";
+    try {
+      parsedPath = new URL(target).pathname;
+    } catch {
+      // keep default
+    }
+
+    const eventPayload = {
+      service: api.api_id,
+      kind: "http_request",
+      operation: target,
+      correlation_id: null,
+      parent_event_id: null,
+      status,
       latency_ms: latency,
-      status_code,
-      error,
-      error_type,
+      error_code: errorCode,
+      error_message: error,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
+      http: {
+        method: "GET",
+        path: parsedPath,
+        status_code: httpStatusCode,
+        target_url: target,
+      },
       tags: { probe: "manual", target },
+      api_key: "default",
     };
 
     // Forward to local ingest endpoint so the normal pipeline + rule engine runs
-    const ingestUrl = `http://127.0.0.1:${config.PORT}/v1/metrics`;
+    const ingestUrl = `http://127.0.0.1:${config.PORT}/v1/events`;
     try {
-      await axios.post(ingestUrl, metricPayload, { timeout: 5000 });
+      await axios.post(ingestUrl, eventPayload, { timeout: 5000 });
       logger.info(
-        { api_id: api.api_id, latency, status_code, error_type },
-        "Probe completed & metric forwarded"
+        { service: api.api_id, latency, status_code: httpStatusCode, status },
+        "Probe completed & event forwarded"
       );
     } catch (postErr: any) {
-      // forward failure: still return metric info but log the error
       logger.error(
         { err: postErr },
-        "Failed to forward metric to ingest endpoint"
+        "Failed to forward event to ingest endpoint"
       );
-      // Return metric payload but mention forward problem
       return res.status(502).json({
-        metric: metricPayload,
+        event: eventPayload,
         warn: "failed to forward to ingest endpoint",
         forwardError: String(postErr?.data ?? postErr),
       });
     }
 
-    return res.status(200).json({ metric: metricPayload });
+    return res.status(200).json({ event: eventPayload });
   } catch (err: any) {
     logger.error({ err }, "Probe failed unexpectedly");
     return res.status(500).json({ error: err?.message ?? "probe failed" });

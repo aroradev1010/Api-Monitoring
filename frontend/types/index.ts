@@ -1,4 +1,5 @@
 // src/types/index.ts
+
 export type Api = {
   api_id: string;
   name: string;
@@ -8,14 +9,35 @@ export type Api = {
   created_at?: string;
 };
 
-export type Metric = {
+export type Event = {
   _id?: string;
-  api_id: string;
-  timestamp: string;
+  event_id?: string;
+  service: string;
+  kind: "http_request" | "job_execution" | "cron_execution" | "custom";
+  operation: string;
+  correlation_id?: string | null;
+  parent_event_id?: string | null;
+  status: "ok" | "error" | "timeout";
   latency_ms: number;
-  status_code: number;
-  error?: string | null;
-  tags?: Record<string, any>;
+  error_code?: string | null;
+  error_message?: string | null;
+  started_at: string;
+  ended_at: string;
+  http?: {
+    method: string;
+    path: string;
+    status_code: number;
+    target_url: string;
+  };
+  job?: {
+    queue: string | null;
+    attempt: number;
+    max_attempts: number;
+  };
+  tags?: Record<string, string>;
+  received_at?: string;
+  sdk_version?: string | null;
+  api_key?: string;
 };
 
 export type Alert = {

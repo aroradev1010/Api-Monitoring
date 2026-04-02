@@ -4,11 +4,11 @@
 import React, { createContext, useContext, useMemo, useRef, useCallback } from "react";
 import { useSSE } from "@/hooks/useSSE";
 
-type MetricPayload = any;
+type EventPayload = any;
 type AlertPayload = any;
 
 export type StreamSubscriber = {
-    onMetric?: (m: MetricPayload) => void;
+    onEvent?: (e: EventPayload) => void;
     onAlert?: (a: AlertPayload) => void;
 };
 
@@ -21,7 +21,7 @@ export type StreamContextValue = {
     /**
      * Subscribe to incoming events. Returns an unsubscribe function.
      * Example:
-     *   const unsub = stream.subscribe({ onMetric: m => ... });
+     *   const unsub = stream.subscribe({ onEvent: e => ... });
      *   unsub(); // stop listening
      */
     subscribe: (s: StreamSubscriber) => () => void;
@@ -40,14 +40,12 @@ export function StreamProvider({
     const subscribersRef = useRef<Set<StreamSubscriber>>(new Set());
 
     // publish helpers (stable references so useSSE callbacks can call them)
-    const publishMetric = useCallback((m: MetricPayload) => {
+    const publishEvent = useCallback((e: EventPayload) => {
         for (const s of subscribersRef.current) {
             try {
-                s.onMetric?.(m);
+                s.onEvent?.(e);
             } catch (err) {
                 // swallow to avoid breaking other subscribers
-                // optionally log
-                // console.error("subscriber onMetric error", err);
             }
         }
     }, []);
@@ -57,7 +55,7 @@ export function StreamProvider({
             try {
                 s.onAlert?.(a);
             } catch (err) {
-                // console.error("subscriber onAlert error", err);
+                // swallow
             }
         }
     }, []);
@@ -65,15 +63,10 @@ export function StreamProvider({
     // wire useSSE to publish into our subscribers set
     const { connected, fallback, lastPing, reconnect, close } = useSSE({
         url,
-        onMetric: publishMetric,
+        onEvent: publishEvent,
         onAlert: publishAlert,
         onFallback: (isFallback) => {
             // optional: expose to analytics / logs
-            if (isFallback) {
-                // console.warn("SSE fallback active");
-            } else {
-                // console.info("SSE recovered");
-            }
         },
     });
 

@@ -3,9 +3,9 @@ import { connectInMemoryMongo, stopInMemoryMongo } from "./test-setup";
 import mongoose from "mongoose";
 import Api from "../models/api.model";
 import Rule from "../models/rule.model";
-import Metric from "../models/metric.model";
+import Event from "../models/event.model";
 import Alert from "../models/alert.model";
-import { evaluateRulesForMetric } from "../services/ruleEngine";
+import { evaluateRulesForEvent } from "../services/ruleEngine";
 
 describe("Rule engine (unit/integration)", () => {
   beforeAll(async () => await connectInMemoryMongo());
@@ -15,7 +15,7 @@ describe("Rule engine (unit/integration)", () => {
     for (const c of cols) await c.deleteMany({});
   });
 
-  test("evaluateRulesForMetric triggers and resolves alerts for latency_gt", async () => {
+  test("evaluateRulesForEvent triggers and resolves alerts for latency_gt", async () => {
     // create api
     await new Api({
       api_id: "rengine-api",
@@ -37,17 +37,30 @@ describe("Rule engine (unit/integration)", () => {
     // ensure no alerts
     expect(await Alert.countDocuments({})).toBe(0);
 
-    // create a metric that should trigger
-    const metric1 = new Metric({
-      api_id: "rengine-api",
-      timestamp: new Date(),
+    // create an event that should trigger
+    const now = new Date();
+    const event1 = new Event({
+      service: "rengine-api",
+      kind: "http_request",
+      operation: "https://example.com",
+      status: "ok",
       latency_ms: 1000,
-      status_code: 200,
+      started_at: now,
+      ended_at: new Date(now.getTime() + 1000),
+      http: {
+        method: "GET",
+        path: "/",
+        status_code: 200,
+        target_url: "https://example.com",
+      },
+      tags: {},
+      received_at: now,
+      api_key: "default",
     });
-    await metric1.save();
+    await event1.save();
 
     // evaluate
-    await evaluateRulesForMetric(metric1);
+    await evaluateRulesForEvent(event1);
 
     // assert an alert exists in triggered state
     let a = await Alert.findOne({
@@ -57,15 +70,28 @@ describe("Rule engine (unit/integration)", () => {
     expect(a).toBeTruthy();
     expect(a?.state).toBe("triggered");
 
-    // now a good metric to resolve
-    const metric2 = new Metric({
-      api_id: "rengine-api",
-      timestamp: new Date(),
+    // now a good event to resolve
+    const now2 = new Date();
+    const event2 = new Event({
+      service: "rengine-api",
+      kind: "http_request",
+      operation: "https://example.com",
+      status: "ok",
       latency_ms: 50,
-      status_code: 200,
+      started_at: now2,
+      ended_at: new Date(now2.getTime() + 50),
+      http: {
+        method: "GET",
+        path: "/",
+        status_code: 200,
+        target_url: "https://example.com",
+      },
+      tags: {},
+      received_at: now2,
+      api_key: "default",
     });
-    await metric2.save();
-    await evaluateRulesForMetric(metric2);
+    await event2.save();
+    await evaluateRulesForEvent(event2);
 
     const resolved = await Alert.findOne({
       rule_id: "rengine-rule",

@@ -12,7 +12,14 @@ describe("Validation middleware", () => {
     for (const c of cols) await c.deleteMany({});
   });
 
-  test("POST /v1/metrics returns 400 for missing required fields", async () => {
+  test("POST /v1/events returns 400 for missing required fields", async () => {
+    const badEvent = { service: "x" /* missing kind, operation, latency_ms, started_at, ended_at, status */ };
+    const res = await request(app).post("/v1/events").send(badEvent);
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("error");
+  });
+
+  test("POST /v1/metrics (legacy) returns 400 for missing required fields", async () => {
     const badMetric = { api_id: "x" /* missing latency_ms and status_code */ };
     const res = await request(app).post("/v1/metrics").send(badMetric);
     expect(res.status).toBe(400);

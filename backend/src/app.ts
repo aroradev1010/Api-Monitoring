@@ -1,7 +1,8 @@
-// backend/src/app.ts (small edit)
+// backend/src/app.ts
 import express from "express";
 import cors from "cors";
 import apisRouter from "./routes/apis";
+import eventsRouter from "./routes/events";
 import metricsRouter from "./routes/metrics";
 import rulesRouter from "./routes/rules";
 import alertsRouter from "./routes/alerts";
@@ -15,6 +16,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/v1/apis", apisRouter);
+app.use("/v1/events", eventsRouter);
+// DEPRECATED: /v1/metrics is kept for backward compatibility.
+// Internally delegates to the Event model. Use /v1/events for new integrations.
 app.use("/v1/metrics", metricsRouter);
 app.use("/v1/rules", rulesRouter);
 app.use("/v1/alerts", alertsRouter);

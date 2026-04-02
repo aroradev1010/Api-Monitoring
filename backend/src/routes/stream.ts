@@ -27,10 +27,10 @@ router.get("/", (req, res) => {
   };
 
   // listeners
-  const onMetric = (m: any) => sendEvent("metric", m);
+  const onEvent = (e: any) => sendEvent("event", e);
   const onAlert = (a: any) => sendEvent("alert", a);
 
-  pubsub.on("metric", onMetric);
+  pubsub.on("event", onEvent);
   pubsub.on("alert", onAlert);
 
   // heartbeat to keep connection alive / detect broken clients
@@ -45,7 +45,7 @@ router.get("/", (req, res) => {
   // cleanup on client disconnect
   req.on("close", () => {
     clearInterval(hb);
-    pubsub.off("metric", onMetric);
+    pubsub.off("event", onEvent);
     pubsub.off("alert", onAlert);
     res.end();
   });

@@ -1,14 +1,19 @@
 // src/controllers/metric.controller.ts
+//
+// BACKWARD-COMPATIBILITY ADAPTER
+// These functions accept the old metric-shaped payloads, convert them
+// to Event documents, and delegate all persistence to the Event model.
+// This keeps /v1/metrics working while Event is the canonical model.
+//
 import { Request, Response } from "express";
-import Metric from "../models/metric.model";
+import Event from "../models/event.model";
 import Api from "../models/api.model";
 import logger from "../logger";
-import { evaluateRulesForMetric } from "../services/ruleEngine";
+import { evaluateRulesForEvent } from "../services/ruleEngine";
 import pubsub from "../services/pubsub";
 
 /**
- * ingestMetric: assumes request body was validated by route-level middleware
- * (but we still defensively coerce/validate here).
+ * Convert a legacy metric payload to an Event and persist it.
  */
 export async function ingestMetric(req: Request, res: Response) {
   try {
@@ -34,7 +39,13 @@ export async function ingestMetric(req: Request, res: Response) {
       return res.status(404).json({ error: "API not registered" });
     }
 
-    // Defensive / sanitise error_type: only accept known values or fallback to "none"
+    // Map metric fields → Event fields
+    const startedAt = payload.timestamp
+      ? new Date(payload.timestamp)
+      : new Date();
+    const latencyMs = payload.latency_ms;
+    const endedAt = new Date(startedAt.getTime() + latencyMs);
+
     const allowedErrorTypes = ["none", "timeout", "network", "http_error"];
     const errorType =
       payload.error_type &&
@@ -42,35 +53,71 @@ export async function ingestMetric(req: Request, res: Response) {
         ? String(payload.error_type)
         : "none";
 
-    // create metric document
-    const metric = new Metric({
-      api_id: payload.api_id,
-      timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
-      latency_ms: payload.latency_ms,
-      status_code: payload.status_code,
-      error: payload.error ?? null,
-      error_type: errorType,
+    // Status mapping per decision doc
+    let status: "ok" | "error" | "timeout";
+    if (errorType === "timeout") {
+      status = "timeout";
+    } else if (payload.status_code >= 500) {
+      status = "error";
+    } else {
+      status = "ok";
+    }
+
+    const errorCode =
+      errorType !== "none" ? errorType.toUpperCase() : null;
+    const errorMessage = payload.error ?? null;
+
+    const targetUrl =
+      (payload.tags as any)?.target ?? api.base_url ?? "";
+    let parsedPath = "/";
+    try {
+      parsedPath = new URL(targetUrl).pathname;
+    } catch {
+      // keep default "/"
+    }
+
+    const event = new Event({
+      service: payload.api_id,
+      kind: "http_request" as const,
+      operation: targetUrl || `probe:${payload.api_id}`,
+      correlation_id: null,
+      parent_event_id: null,
+      status,
+      latency_ms: latencyMs,
+      error_code: errorCode,
+      error_message: errorMessage,
+      started_at: startedAt,
+      ended_at: endedAt,
+      http: {
+        method: "GET",
+        path: parsedPath,
+        status_code: payload.status_code,
+        target_url: targetUrl,
+      },
       tags: payload.tags ?? {},
+      received_at: new Date(),
+      sdk_version: null,
+      api_key: "default",
     });
 
-    const saved = await metric.save();
+    const saved = await event.save();
+
     // Publish to pubsub for real-time streaming
     try {
-      pubsub.emit("metric", saved.toObject());
+      pubsub.emit("event", saved.toObject());
     } catch (e) {
-      logger.warn({ err: e }, "pubsub emit metric failed");
+      logger.warn({ err: e }, "pubsub emit event failed");
     }
 
     // Fire-and-forget rule evaluation
-    evaluateRulesForMetric(metric).catch((e) =>
-      logger.error({ err: e, metricId: metric._id }, "Rule evaluation failed")
+    evaluateRulesForEvent(saved).catch((e) =>
+      logger.error({ err: e, eventId: saved._id }, "Rule evaluation failed")
     );
 
     logger.debug(
-      { api_id: metric.api_id, latency: metric.latency_ms },
-      "metric ingested"
+      { service: event.service, latency: event.latency_ms },
+      "metric ingested (compat → event)"
     );
-    // 202 accepted — ingestion is async with rules executed in background
     return res.status(202).json({ status: "accepted" });
   } catch (err: any) {
     logger.error({ err }, "ingestMetric failed");
@@ -79,7 +126,8 @@ export async function ingestMetric(req: Request, res: Response) {
 }
 
 /**
- * getMetrics: query ?api_id=&limit=
+ * getMetrics: backward-compat wrapper that reads from Event collection
+ * and maps back to the old metric shape.
  */
 export async function getMetrics(req: Request, res: Response) {
   try {
@@ -88,11 +136,29 @@ export async function getMetrics(req: Request, res: Response) {
 
     if (!api_id) return res.status(400).json({ error: "api_id required" });
 
-    const metrics = await Metric.find({ api_id })
-      .sort({ timestamp: -1 })
+    const events = await Event.find({ service: api_id })
+      .sort({ started_at: -1 })
       .limit(limit)
       .lean()
       .exec();
+
+    // Map events back to legacy metric shape for backward compatibility
+    const metrics = events.map((e) => ({
+      _id: e._id,
+      api_id: e.service,
+      timestamp: e.started_at,
+      latency_ms: e.latency_ms,
+      status_code: e.http?.status_code ?? 0,
+      error: e.error_message ?? null,
+      error_type:
+        e.status === "timeout"
+          ? "timeout"
+          : e.error_code
+          ? e.error_code.toLowerCase()
+          : "none",
+      tags: e.tags ?? {},
+    }));
+
     return res.json(metrics);
   } catch (err: any) {
     logger.error({ err }, "getMetrics failed");

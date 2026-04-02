@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type UseSSEOptions = {
-  onMetric?: (m: any) => void;
+  onEvent?: (e: any) => void;
   onAlert?: (a: any) => void;
   onPing?: (p: any) => void;
   onOpen?: () => void;
@@ -20,7 +20,7 @@ type UseSSEOptions = {
 export function useSSE(opts: UseSSEOptions = {}) {
   const {
     url = "/v1/stream",
-    onMetric,
+    onEvent,
     onAlert,
     onPing,
     onOpen,
@@ -93,10 +93,10 @@ export function useSSE(opts: UseSSEOptions = {}) {
         }
       });
 
-      es.addEventListener("metric", (ev: MessageEvent) => {
+      es.addEventListener("event", (ev: MessageEvent) => {
         try {
           const payload = JSON.parse(ev.data);
-          onMetric && onMetric(payload);
+          onEvent && onEvent(payload);
         } catch {
           // ignore parse errors
         }
@@ -120,7 +120,7 @@ export function useSSE(opts: UseSSEOptions = {}) {
       setConnected(false);
       scheduleReconnect();
     }
-  }, [url, onMetric, onAlert, onPing, onOpen, onFallback]);
+  }, [url, onEvent, onAlert, onPing, onOpen, onFallback]);
 
   // schedule reconnect with backoff
   const scheduleReconnect = useCallback(() => {

@@ -10,13 +10,13 @@ import {
     CardTitle,
     CardFooter,
 } from "@/components/ui/card";
-import { Alert, Api, Metric } from "@/types";
-import { getMetrics, listAlerts, listApis, postMetricProbe } from "@/services/api";
+import { Alert, Api, Event } from "@/types";
+import { getEvents, listAlerts, listApis, postProbe } from "@/services/api";
 import ApiSelector from "@/components/ApiSelector";
 import ApiManager from "@/components/ApiManager";
 import RuleManager from "@/components/RuleManager";
 import AlertsList from "@/components/AlertsList";
-import MetricsTable from "@/components/MetricsTable";
+import EventsTable from "@/components/MetricsTable";
 import { useStream } from "@/context/stream";
 import { toast } from "sonner";
 import LastUpdated from "@/components/LastUpdated";
@@ -24,10 +24,10 @@ import { Activity, RefreshCw, Loader2, Play, Info, BellRing } from "lucide-react
 export default function DashboardPage() {
     const [apis, setApis] = useState<Api[]>([]);
     const [selectedApi, setSelectedApi] = useState<string>("");
-    const [metrics, setMetrics] = useState<Metric[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loadingApis, setLoadingApis] = useState(false);
-    const [loadingMetrics, setLoadingMetrics] = useState(false);
+    const [loadingEvents, setLoadingEvents] = useState(false);
     const [loadingAlerts, setLoadingAlerts] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [probeBusy, setProbeBusy] = useState(false);
@@ -43,11 +43,11 @@ export default function DashboardPage() {
 
     useEffect(() => {
         if (!selectedApi) {
-            setMetrics([]);
+            setEvents([]);
             setAlerts([]);
             return;
         }
-        loadMetrics(selectedApi);
+        loadEvents(selectedApi);
         loadAlerts(selectedApi);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedApi]);
@@ -66,16 +66,16 @@ export default function DashboardPage() {
         }
     }
 
-    async function loadMetrics(api_id: string) {
-        setLoadingMetrics(true);
+    async function loadEvents(service: string) {
+        setLoadingEvents(true);
         setError(null);
         try {
-            const data = await getMetrics(api_id, 30);
-            setMetrics(data || []);
+            const data = await getEvents(service, 30);
+            setEvents(data || []);
         } catch (e: any) {
-            setError(e?.message ?? "Failed to load metrics");
+            setError(e?.message ?? "Failed to load events");
         } finally {
-            setLoadingMetrics(false);
+            setLoadingEvents(false);
         }
     }
 
@@ -100,7 +100,7 @@ export default function DashboardPage() {
         setProbeBusy(true);
         setError(null);
         try {
-            await postMetricProbe(selectedApi);
+            await postProbe(selectedApi);
             // rely on SSE to update UI; no re-fetch here
         } catch (e: any) {
             setError(e?.message ?? "Manual probe failed");
@@ -110,20 +110,20 @@ export default function DashboardPage() {
     }
 
     // SSE handlers: update lists + toast
-    const handleIncomingMetric = useCallback(
-        (m: Metric | any) => {
-            setMetrics((prev) => {
-                const key = `${m.api_id}:${m.timestamp ?? m.created_at ?? m._id ?? ""}`;
+    const handleIncomingEvent = useCallback(
+        (e: Event | any) => {
+            setEvents((prev) => {
+                const key = `${e.service}:${e.started_at ?? e._id ?? ""}`;
                 if (prev.length) {
-                    const firstKey = `${prev[0].api_id}:${(prev[0] as any).timestamp ?? (prev[0] as any).created_at ?? (prev[0] as any)._id ?? ""}`;
+                    const firstKey = `${prev[0].service}:${prev[0].started_at ?? (prev[0] as any)._id ?? ""}`;
                     if (firstKey === key) return prev;
                 }
-                return [m as Metric, ...prev].slice(0, 30);
+                return [e as Event, ...prev].slice(0, 30);
             });
 
-            toast(`Metric: ${m.api_id} — ${m.latency_ms ?? "?"}ms (${m.status_code ?? "?"})`);
+            toast(`Event: ${e.service} — ${e.latency_ms ?? "?"}ms (${e.http?.status_code ?? e.status ?? "?"})`);
         },
-        [] // no dependencies that change identity frequently
+        []
     );
 
     const handleIncomingAlert = useCallback(
@@ -146,28 +146,22 @@ export default function DashboardPage() {
                         if (a.api_id) {
                             setSelectedApi(a.api_id);
                             loadAlerts(a.api_id);
-                            loadMetrics(a.api_id);
+                            loadEvents(a.api_id);
                         }
                     },
                 },
             });
         },
-        // loadAlerts/loadMetrics captured by reference from component scope; safe to omit here
         []
     );
 
     // subscribe/unsubscribe when component mounts/unmounts
     useEffect(() => {
-        // stream.subscribe should be implemented on your provider and return an unsubscribe function
-        // subscription may optionally accept filters (we pass everything and filter in handlers if needed)
         const unsubscribe = stream.subscribe({
-            onMetric: (m: any) => {
-                // if you want only metrics for selectedApi uncomment:
-                // if (selectedApi && m.api_id !== selectedApi) return;
-                handleIncomingMetric(m);
+            onEvent: (e: any) => {
+                handleIncomingEvent(e);
             },
             onAlert: (a: any) => {
-                // optionally filter alerts by selectedApi
                 handleIncomingAlert(a);
             },
         });
@@ -177,7 +171,7 @@ export default function DashboardPage() {
                 unsubscribe && unsubscribe();
             } catch { }
         };
-    }, [stream, selectedApi, handleIncomingMetric, handleIncomingAlert]);
+    }, [stream, selectedApi, handleIncomingEvent, handleIncomingAlert]);
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -198,7 +192,7 @@ export default function DashboardPage() {
                     <Button
                         onClick={() => {
                             if (selectedApi) {
-                                loadMetrics(selectedApi);
+                                loadEvents(selectedApi);
                                 loadAlerts(selectedApi);
                             }
                         }}
@@ -251,7 +245,7 @@ export default function DashboardPage() {
                                 <div className="flex-1 sm:flex-none max-w-[200px]">
                                     <ApiSelector apis={apis} selectedApi={selectedApi} onChange={setSelectedApi} loading={loadingApis} />
                                 </div>
-                                <Button size="icon" variant="outline" className="h-9 w-9 shrink-0 hover:bg-primary/5 hover:text-primary transition-colors border-border/60 hover:border-primary/30" onClick={() => { if (selectedApi) { loadMetrics(selectedApi); loadAlerts(selectedApi); } }} title="Reload Data">
+                                <Button size="icon" variant="outline" className="h-9 w-9 shrink-0 hover:bg-primary/5 hover:text-primary transition-colors border-border/60 hover:border-primary/30" onClick={() => { if (selectedApi) { loadEvents(selectedApi); loadAlerts(selectedApi); } }} title="Reload Data">
                                     <RefreshCw className="w-4 h-4" />
                                 </Button>
                             </div>
@@ -261,7 +255,7 @@ export default function DashboardPage() {
                             <div className="flex sm:flex-row flex-col items-start sm:items-center justify-between mb-5 gap-3">
                                 <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
                                     <Activity className="w-3.5 h-3.5 text-muted-foreground" />
-                                    Recent Probe Metrics
+                                    Recent Events
                                 </h3>
                                 <Button size="sm" onClick={runManualProbe} disabled={probeBusy || !selectedApi} className="shadow-sm w-full sm:w-auto transition-all h-8">
                                     {probeBusy ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-2" />}
@@ -269,7 +263,7 @@ export default function DashboardPage() {
                                 </Button>
                             </div>
 
-                            <MetricsTable metrics={metrics} loading={loadingMetrics} />
+                            <EventsTable events={events} loading={loadingEvents} />
                         </CardContent>
                         <CardFooter className="bg-muted/20 border-t py-2.5 px-6">
                             <small className="text-muted-foreground flex items-center gap-1.5"><Info className="w-3.5 h-3.5 shrink-0" /> Manual probes contact the server immediately. Data is delivered via low-latency SSE.</small>

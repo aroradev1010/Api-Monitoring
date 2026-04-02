@@ -4,7 +4,7 @@ import app from "../app";
 import { connectInMemoryMongo, stopInMemoryMongo } from "./test-setup";
 import mongoose from "mongoose";
 import Api from "../models/api.model";
-import Metric from "../models/metric.model";
+import Event from "../models/event.model";
 import Rule from "../models/rule.model";
 import Alert from "../models/alert.model";
 
@@ -20,7 +20,7 @@ describe("API delete cascade", () => {
     for (const c of cols) await c.deleteMany({});
   });
 
-  test("DELETE /v1/apis/:api_id removes API, metrics, rules, alerts", async () => {
+  test("DELETE /v1/apis/:api_id removes API, events, rules, alerts", async () => {
     // create api
     const apiPayload = {
       api_id: "cascade-api",
@@ -41,14 +41,27 @@ describe("API delete cascade", () => {
       threshold: 100,
     });
 
-    // create metric document
-    const m = new Metric({
-      api_id: "cascade-api",
-      timestamp: new Date(),
+    // create event document (directly, not via HTTP)
+    const now = new Date();
+    const e = new Event({
+      service: "cascade-api",
+      kind: "http_request",
+      operation: "https://example.com",
+      status: "ok",
       latency_ms: 200,
-      status_code: 200,
+      started_at: now,
+      ended_at: new Date(now.getTime() + 200),
+      http: {
+        method: "GET",
+        path: "/",
+        status_code: 200,
+        target_url: "https://example.com",
+      },
+      tags: {},
+      received_at: now,
+      api_key: "default",
     });
-    await m.save();
+    await e.save();
 
     // create an alert referencing that rule/api
     const a = new Alert({
@@ -62,18 +75,17 @@ describe("API delete cascade", () => {
     // sanity check counts
     expect(await Api.countDocuments({ api_id: "cascade-api" })).toBe(1);
     expect(await Rule.countDocuments({ api_id: "cascade-api" })).toBe(1);
-    expect(await Metric.countDocuments({ api_id: "cascade-api" })).toBe(1);
+    expect(await Event.countDocuments({ service: "cascade-api" })).toBe(1);
     expect(await Alert.countDocuments({ api_id: "cascade-api" })).toBe(1);
 
     // call delete API endpoint
     const del = await request(app).delete("/v1/apis/cascade-api");
     expect([200, 204]).toContain(del.status);
 
-    // wait a tiny bit if delete does async sub-deletes (but controller should be sync)
     // check removal
     expect(await Api.countDocuments({ api_id: "cascade-api" })).toBe(0);
     expect(await Rule.countDocuments({ api_id: "cascade-api" })).toBe(0);
-    expect(await Metric.countDocuments({ api_id: "cascade-api" })).toBe(0);
+    expect(await Event.countDocuments({ service: "cascade-api" })).toBe(0);
     expect(await Alert.countDocuments({ api_id: "cascade-api" })).toBe(0);
   });
 });

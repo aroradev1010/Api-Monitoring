@@ -1,6 +1,6 @@
 // src/services/api.ts
 
-import { Alert, Api, Metric, Rule } from "@/types";
+import { Alert, Api, Event, Rule } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
@@ -31,19 +31,18 @@ export async function deleteApi(api_id: string): Promise<void> {
   });
 }
 
-// Metrics
-export async function getMetrics(
-  api_id: string,
+// Events
+export async function getEvents(
+  service: string,
   limit = 30
-): Promise<Metric[]> {
+): Promise<Event[]> {
   const res = await fetch(
-    `${BASE}/v1/metrics?api_id=${encodeURIComponent(api_id)}&limit=${limit}`
+    `${BASE}/v1/events?service=${encodeURIComponent(service)}&limit=${limit}`
   );
-  return handleRes<Metric[]>(res);
+  return handleRes<Event[]>(res);
 }
 
-
-export async function postMetricProbe(api_id: string, timeout = 10000) {
+export async function postProbe(api_id: string, timeout = 10000) {
   const res = await fetch(`${BASE}/v1/probe/${encodeURIComponent(api_id)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -55,7 +54,7 @@ export async function postMetricProbe(api_id: string, timeout = 10000) {
     throw new Error(`Probe failed (${res.status}): ${body ?? ""}`);
   }
   const json = await res.json();
-  return json; // returns { metric: {...} } (or { metric: .., warn: .. } on forward fail)
+  return json; // returns { event: {...} } (or { event: .., warn: .. } on forward fail)
 }
 
 // Alerts

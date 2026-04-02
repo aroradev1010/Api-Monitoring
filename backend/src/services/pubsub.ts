@@ -2,7 +2,7 @@
 import { EventEmitter } from "events";
 
 export type PubSubEvents = {
-  metric: any; // metric object saved (lean/plain object)
+  event: any; // event object saved (lean/plain object)
   alert: any; // alert object saved
 };
 

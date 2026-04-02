@@ -26,8 +26,6 @@ async function waitForAlert(
       state,
     }).lean();
     if (a) return a;
-    // small sleep
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, interval));
   }
   return null;
@@ -59,7 +57,6 @@ describe("Rule Engine & Alerts (integration)", () => {
   });
 
   afterEach(async () => {
-    // clear DB between tests
     const collections = await mongoose.connection.db.collections();
     for (const c of collections) {
       await c.deleteMany({});
@@ -69,33 +66,39 @@ describe("Rule Engine & Alerts (integration)", () => {
   test("creates and resolves an alert for a latency_gt rule", async () => {
     // 1) create API
     const apires = await request(app).post("/v1/apis").send(apiPayload);
-
     expect([200, 201]).toContain(apires.status);
 
     // 2) create rule
     const rres = await request(app).post("/v1/rules").send(rulePayload);
-    
     expect([200, 201]).toContain(rres.status);
-    
+
     // Ensure no alerts exist initially
     let alerts = await Alert.find({
       rule_id: rulePayload.rule_id,
       api_id: rulePayload.api_id,
     });
     expect(alerts.length).toBe(0);
-    
-    // 3) send a bad metric that should trigger the alert (latency 1000ms > 500)
-    const badMetric = {
-      api_id: apiPayload.api_id,
-      timestamp: new Date().toISOString(),
+
+    // 3) send a bad event that should trigger the alert (latency 1000ms > 500)
+    const now = new Date();
+    const badEvent = {
+      service: apiPayload.api_id,
+      kind: "http_request",
+      operation: "https://httpbin.org/delay/0",
+      status: "ok",
       latency_ms: 1000,
-      status_code: 200,
-      error: null,
+      started_at: now.toISOString(),
+      ended_at: new Date(now.getTime() + 1000).toISOString(),
+      http: {
+        method: "GET",
+        path: "/delay/0",
+        status_code: 200,
+        target_url: "https://httpbin.org/delay/0",
+      },
       tags: {},
     };
-    
-    const mres1 = await request(app).post("/v1/metrics").send(badMetric);
 
+    const mres1 = await request(app).post("/v1/events").send(badEvent);
     expect([200, 202]).toContain(mres1.status);
 
     // Wait for async rule engine to create the alert
@@ -114,17 +117,26 @@ describe("Rule Engine & Alerts (integration)", () => {
       expect(triggered.payload).toBeDefined();
     }
 
-    // 4) send a good metric that resolves the alert (latency 50ms)
-    const goodMetric = {
-      api_id: apiPayload.api_id,
-      timestamp: new Date().toISOString(),
+    // 4) send a good event that resolves the alert (latency 50ms)
+    const now2 = new Date();
+    const goodEvent = {
+      service: apiPayload.api_id,
+      kind: "http_request",
+      operation: "https://httpbin.org/delay/0",
+      status: "ok",
       latency_ms: 50,
-      status_code: 200,
-      error: null,
+      started_at: now2.toISOString(),
+      ended_at: new Date(now2.getTime() + 50).toISOString(),
+      http: {
+        method: "GET",
+        path: "/delay/0",
+        status_code: 200,
+        target_url: "https://httpbin.org/delay/0",
+      },
       tags: {},
     };
 
-    const mres2 = await request(app).post("/v1/metrics").send(goodMetric);
+    const mres2 = await request(app).post("/v1/events").send(goodEvent);
     expect([200, 202]).toContain(mres2.status);
 
     // Wait for resolution

@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import Api from "../models/api.model";
 import logger from "../logger";
-import Metric from "../models/metric.model";
+import Event from "../models/event.model";
 import Rule from "../models/rule.model";
 import Alert from "../models/alert.model";
 
@@ -65,9 +65,9 @@ export async function deleteApi(req: Request, res: Response) {
       return res.status(404).json({ error: "API not found" });
     }
 
-    // Cascade delete associated data (metrics, rules, alerts)
-    const [metricsDel, rulesDel, alertsDel] = await Promise.all([
-      Metric.deleteMany({ api_id }).exec(),
+    // Cascade delete associated data (events, rules, alerts)
+    const [eventsDel, rulesDel, alertsDel] = await Promise.all([
+      Event.deleteMany({ service: api_id }).exec(),
       Rule.deleteMany({ api_id }).exec(),
       Alert.deleteMany({ api_id }).exec(),
     ]);
@@ -75,7 +75,7 @@ export async function deleteApi(req: Request, res: Response) {
     logger.info(
       {
         api_id,
-        deletedMetrics: metricsDel.deletedCount,
+        deletedEvents: eventsDel.deletedCount,
         deletedRules: rulesDel.deletedCount,
         deletedAlerts: alertsDel.deletedCount,
       },
