@@ -1,6 +1,6 @@
 // src/services/api.ts
 
-import { Alert, Api, Event, Rule } from "@/types";
+import { Alert, Api, Event, Explanation, Rule, ServiceDependency, ServiceInfo } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
@@ -54,7 +54,7 @@ export async function postProbe(api_id: string, timeout = 10000) {
     throw new Error(`Probe failed (${res.status}): ${body ?? ""}`);
   }
   const json = await res.json();
-  return json; // returns { event: {...} } (or { event: .., warn: .. } on forward fail)
+  return json;
 }
 
 // Alerts
@@ -89,4 +89,67 @@ export async function deleteRule(rule_id: string) {
   await fetch(`${BASE}/v1/rules/${encodeURIComponent(rule_id)}`, {
     method: "DELETE",
   });
+}
+
+// ─── Explanations ──────────────────────────────────────────────────
+
+export async function getExplanations(
+  service?: string,
+  limit = 20
+): Promise<Explanation[]> {
+  const q = new URLSearchParams();
+  if (service) q.set("service", service);
+  q.set("limit", String(limit));
+  const res = await fetch(`${BASE}/v1/explanations?${q.toString()}`);
+  return handleRes<Explanation[]>(res);
+}
+
+export async function getExplanationById(id: string): Promise<Explanation> {
+  const res = await fetch(
+    `${BASE}/v1/explanations/${encodeURIComponent(id)}`
+  );
+  return handleRes<Explanation>(res);
+}
+
+export async function getLatestExplanation(
+  service: string
+): Promise<Explanation> {
+  const res = await fetch(
+    `${BASE}/v1/explanations/latest?service=${encodeURIComponent(service)}`
+  );
+  return handleRes<Explanation>(res);
+}
+
+// ─── Dependencies ──────────────────────────────────────────────────
+
+export async function getDependencies(
+  service?: string
+): Promise<ServiceDependency[]> {
+  const q = service ? `?service=${encodeURIComponent(service)}` : "";
+  const res = await fetch(`${BASE}/v1/dependencies${q}`);
+  return handleRes<ServiceDependency[]>(res);
+}
+
+export async function createDependency(
+  payload: Partial<ServiceDependency>
+): Promise<ServiceDependency> {
+  const res = await fetch(`${BASE}/v1/dependencies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleRes<ServiceDependency>(res);
+}
+
+export async function deleteDependency(id: string): Promise<void> {
+  await fetch(`${BASE}/v1/dependencies/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+// ─── Services ──────────────────────────────────────────────────────
+
+export async function listServices(): Promise<ServiceInfo[]> {
+  const res = await fetch(`${BASE}/v1/services`);
+  return handleRes<ServiceInfo[]>(res);
 }

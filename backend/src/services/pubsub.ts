@@ -4,6 +4,7 @@ import { EventEmitter } from "events";
 export type PubSubEvents = {
   event: any; // event object saved (lean/plain object)
   alert: any; // alert object saved
+  explanation: any; // explanation object saved
 };
 
 class TypedEmitter extends EventEmitter {

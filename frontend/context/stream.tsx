@@ -6,10 +6,12 @@ import { useSSE } from "@/hooks/useSSE";
 
 type EventPayload = any;
 type AlertPayload = any;
+type ExplanationPayload = any;
 
 export type StreamSubscriber = {
     onEvent?: (e: EventPayload) => void;
     onAlert?: (a: AlertPayload) => void;
+    onExplanation?: (x: ExplanationPayload) => void;
 };
 
 export type StreamContextValue = {
@@ -60,11 +62,22 @@ export function StreamProvider({
         }
     }, []);
 
+    const publishExplanation = useCallback((x: ExplanationPayload) => {
+        for (const s of subscribersRef.current) {
+            try {
+                s.onExplanation?.(x);
+            } catch (err) {
+                // swallow
+            }
+        }
+    }, []);
+
     // wire useSSE to publish into our subscribers set
     const { connected, fallback, lastPing, reconnect, close } = useSSE({
         url,
         onEvent: publishEvent,
         onAlert: publishAlert,
+        onExplanation: publishExplanation,
         onFallback: (isFallback) => {
             // optional: expose to analytics / logs
         },

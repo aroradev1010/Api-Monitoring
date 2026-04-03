@@ -2,8 +2,10 @@
 import { Request, Response } from "express";
 import Event from "../models/event.model";
 import Api from "../models/api.model";
+import Service from "../models/service.model";
 import logger from "../logger";
 import { evaluateRulesForEvent } from "../services/ruleEngine";
+import { attachEvent } from "../services/correlationEngine";
 import pubsub from "../services/pubsub";
 
 /**
@@ -41,11 +43,31 @@ export async function ingestEvent(req: Request, res: Response) {
 
     const saved = await event.save();
 
+    // Upsert Service record (auto-create on first event)
+    Service.updateOne(
+      { name: saved.service },
+      {
+        $setOnInsert: { first_seen_at: new Date() },
+        $set: { last_seen_at: new Date() },
+        $inc: { event_count: 1 },
+      },
+      { upsert: true }
+    )
+      .exec()
+      .catch((e) => logger.warn({ err: e }, "Service upsert failed"));
+
     // Publish to pubsub for real-time streaming
     try {
       pubsub.emit("event", saved.toObject());
     } catch (e) {
       logger.warn({ err: e }, "pubsub emit event failed");
+    }
+
+    // Attach to correlation engine (fire-and-forget)
+    try {
+      attachEvent(saved);
+    } catch (e) {
+      logger.warn({ err: e }, "correlationEngine.attachEvent failed");
     }
 
     // Fire-and-forget rule evaluation

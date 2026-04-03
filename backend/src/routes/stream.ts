@@ -29,9 +29,11 @@ router.get("/", (req, res) => {
   // listeners
   const onEvent = (e: any) => sendEvent("event", e);
   const onAlert = (a: any) => sendEvent("alert", a);
+  const onExplanation = (x: any) => sendEvent("explanation", x);
 
   pubsub.on("event", onEvent);
   pubsub.on("alert", onAlert);
+  pubsub.on("explanation", onExplanation);
 
   // heartbeat to keep connection alive / detect broken clients
   const hb = setInterval(() => {
@@ -47,6 +49,7 @@ router.get("/", (req, res) => {
     clearInterval(hb);
     pubsub.off("event", onEvent);
     pubsub.off("alert", onAlert);
+    pubsub.off("explanation", onExplanation);
     res.end();
   });
 });

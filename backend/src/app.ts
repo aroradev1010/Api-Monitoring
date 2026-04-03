@@ -6,6 +6,8 @@ import eventsRouter from "./routes/events";
 import metricsRouter from "./routes/metrics";
 import rulesRouter from "./routes/rules";
 import alertsRouter from "./routes/alerts";
+import explanationsRouter from "./routes/explanations";
+import dependenciesRouter, { servicesRouter } from "./routes/dependencies";
 import errorHandler from "./middlewares/errorHandler";
 import probeRouter from "./routes/probe";
 import streamRouter from "./routes/stream";
@@ -18,10 +20,12 @@ app.use(express.json());
 app.use("/v1/apis", apisRouter);
 app.use("/v1/events", eventsRouter);
 // DEPRECATED: /v1/metrics is kept for backward compatibility.
-// Internally delegates to the Event model. Use /v1/events for new integrations.
 app.use("/v1/metrics", metricsRouter);
 app.use("/v1/rules", rulesRouter);
 app.use("/v1/alerts", alertsRouter);
+app.use("/v1/explanations", explanationsRouter);
+app.use("/v1/dependencies", dependenciesRouter);
+app.use("/v1/services", servicesRouter);
 app.use("/v1/probe", probeRouter);
 app.use("/v1/stream", streamRouter);
 if (process.env.NODE_ENV !== "production") {

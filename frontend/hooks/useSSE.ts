@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type UseSSEOptions = {
   onEvent?: (e: any) => void;
   onAlert?: (a: any) => void;
+  onExplanation?: (x: any) => void;
   onPing?: (p: any) => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -22,6 +23,7 @@ export function useSSE(opts: UseSSEOptions = {}) {
     url = "/v1/stream",
     onEvent,
     onAlert,
+    onExplanation,
     onPing,
     onOpen,
     onClose,
@@ -111,6 +113,15 @@ export function useSSE(opts: UseSSEOptions = {}) {
         }
       });
 
+      es.addEventListener("explanation", (ev: MessageEvent) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          onExplanation && onExplanation(payload);
+        } catch {
+          // ignore parse errors
+        }
+      });
+
       // also handle default message
       es.onmessage = (ev: MessageEvent) => {
         // no-op here — specialized listeners above handle events
@@ -120,7 +131,7 @@ export function useSSE(opts: UseSSEOptions = {}) {
       setConnected(false);
       scheduleReconnect();
     }
-  }, [url, onEvent, onAlert, onPing, onOpen, onFallback]);
+  }, [url, onEvent, onAlert, onExplanation, onPing, onOpen, onFallback]);
 
   // schedule reconnect with backoff
   const scheduleReconnect = useCallback(() => {
