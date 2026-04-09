@@ -1,0 +1,161 @@
+﻿node.exe : PASS __tests__/t
+rackExpress.test.ts
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (PAS  
+  S __tests__/trackExpre   
+ ss.test.ts:String) [],    
+ RemoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+  trackExpress()
+    ΓêÜ sets up ALS 
+context and calls next() 
+(4 ms)
+    ΓêÜ provides 
+correlation context inside 
+the handler (2 ms)
+    ΓêÜ reuses 
+X-Correlation-ID from 
+headers
+    ΓêÜ emits an 
+http_request event on 
+response finish (1 ms)
+    ΓêÜ sets status to 
+error for 4xx/5xx responses
+    ΓêÜ passes through 
+silently if SDK is not 
+initialized
+
+[api-monitor-sdk] Warning: 
+track("orphan") called 
+outside of a correlation 
+context
+PASS 
+__tests__/track.test.ts
+  track()
+    ΓêÜ returns the value 
+from fn (1 ms)
+    ΓêÜ re-throws errors 
+from fn (6 ms)
+    ΓêÜ emits an event 
+with kind: custom
+    ΓêÜ emits error event 
+when fn throws
+    ΓêÜ creates a child 
+context inside fn (1 ms)
+    ΓêÜ adds 
+_context_missing tag when 
+called outside context (1 
+ms)
+
+PASS 
+__tests__/context.test.ts
+  CorrelationContext
+    createRootContext
+      ΓêÜ creates a root 
+context with depth 0 (2 ms)
+      ΓêÜ reuses provided 
+correlationId
+      ΓêÜ generates new 
+correlationId when none 
+provided (1 ms)
+      ΓêÜ returns a frozen 
+(immutable) object (5 ms)
+    createChildContext
+      ΓêÜ inherits 
+correlationId and service 
+from parent (1 ms)
+      ΓêÜ increments depth 
+by 1 (1 ms)
+      ΓêÜ generates a new 
+currentEventId
+      ΓêÜ does NOT mutate 
+the parent
+      ΓêÜ returns a frozen 
+object (1 ms)
+    getContext / 
+runWithContext
+      ΓêÜ returns null 
+outside of any ALS context 
+(1 ms)
+      ΓêÜ returns the 
+active context inside 
+runWithContext (1 ms)
+      ΓêÜ nests contexts 
+correctly (1 ms)
+      ΓêÜ propagates 
+context through async 
+boundaries (24 ms)
+
+PASS __tests__/integration.
+test.ts
+  Integration: Context 
+Propagation
+    ΓêÜ forms correct 
+parent-child chain: HTTP 
+ΓåÆ track ΓåÆ track (1 ms)
+    ΓêÜ cron always 
+creates a new correlationId
+    ΓêÜ captureContext 
+preserves context across 
+async boundaries
+    ΓêÜ all events have 
+required tags (env, 
+service) (1 ms)
+    ΓêÜ all events have 
+sdk_version and api_key (1 
+ms)
+
+[api-monitor-sdk] Batch 
+send failed (attempt 1/3): 
+network error
+[api-monitor-sdk] Sent 
+batch of 1 events
+PASS 
+__tests__/buffer.test.ts
+  EventBuffer
+    ΓêÜ does not flush 
+until batch size is 
+reached (1 ms)
+    ΓêÜ flushes when batch 
+reaches 50 events (1 ms)
+    ΓêÜ manual flush sends 
+whatever is in buffer (1 
+ms)
+    ΓêÜ does not send if 
+buffer is empty on flush
+    ΓêÜ does not add 
+events when disabled (1 ms)
+    ΓêÜ retries on failure 
+with exponential backoff 
+(2 ms)
+    ΓêÜ drain flushes 
+remaining buffer (54 ms)
+
+Test Suites: 5 passed, 5 
+total
+Tests:       37 passed, 37 
+total
+Snapshots:   0 total
+Time:        2.352 s
+Ran all test suites.
+Jest did not exit one 
+second after the test run 
+has completed.
+
+'This usually means that 
+there are asynchronous 
+operations that weren't 
+stopped in your tests. 
+Consider running Jest with 
+`--detectOpenHandles` to 
+troubleshoot this issue.

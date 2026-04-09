@@ -69,6 +69,23 @@ export const ingestEventSchema: ObjectSchema = Joi.object({
 
   tags: Joi.object().optional().unknown(true),
 
+  event_id: Joi.string().optional(),
   sdk_version: Joi.string().allow(null).optional(),
   api_key: Joi.string().optional().default("default"),
+}).options({ stripUnknown: true });
+
+/**
+ * Validation schema for POST /v1/events/batch (SDK batch ingest)
+ */
+export const ingestBatchSchema: ObjectSchema = Joi.object({
+  events: Joi.array()
+    .items(ingestEventSchema)
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      "array.min": "events array must contain at least 1 event",
+      "array.max": "events array must not exceed 100 events",
+      "any.required": "events array is required",
+    }),
 }).options({ stripUnknown: true });

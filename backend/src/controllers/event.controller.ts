@@ -108,4 +108,96 @@ export async function getEvents(req: Request, res: Response) {
   }
 }
 
-export default { ingestEvent, getEvents };
+/**
+ * ingestBatch: accepts { events: Event[] } and processes each independently.
+ * Reuses the same ingest logic as ingestEvent.
+ */
+export async function ingestBatch(req: Request, res: Response) {
+  try {
+    const { events: payloads } = req.body;
+
+    if (!Array.isArray(payloads) || payloads.length === 0) {
+      return res.status(400).json({ error: "events array is required" });
+    }
+
+    let accepted = 0;
+
+    for (const payload of payloads) {
+      try {
+        // Semantic check: ensure the service (API) is registered
+        const api = await Api.findOne({ api_id: payload.service }).lean().exec();
+        if (!api) {
+          logger.warn({ service: payload.service }, "batch: API not registered, skipping event");
+          continue;
+        }
+
+        const event = new Event({
+          event_id: payload.event_id ?? undefined,
+          service: payload.service,
+          kind: payload.kind,
+          operation: payload.operation,
+          correlation_id: payload.correlation_id ?? null,
+          parent_event_id: payload.parent_event_id ?? null,
+          status: payload.status,
+          latency_ms: payload.latency_ms,
+          error_code: payload.error_code ?? null,
+          error_message: payload.error_message ?? null,
+          started_at: new Date(payload.started_at),
+          ended_at: new Date(payload.ended_at),
+          http: payload.http ?? undefined,
+          job: payload.job ?? undefined,
+          tags: payload.tags ?? {},
+          received_at: new Date(),
+          sdk_version: payload.sdk_version ?? null,
+          api_key: payload.api_key ?? "default",
+        });
+
+        const saved = await event.save();
+
+        // Upsert Service record
+        Service.updateOne(
+          { name: saved.service },
+          {
+            $setOnInsert: { first_seen_at: new Date() },
+            $set: { last_seen_at: new Date() },
+            $inc: { event_count: 1 },
+          },
+          { upsert: true }
+        )
+          .exec()
+          .catch((e) => logger.warn({ err: e }, "Service upsert failed"));
+
+        // Publish to pubsub
+        try {
+          pubsub.emit("event", saved.toObject());
+        } catch (e) {
+          logger.warn({ err: e }, "pubsub emit event failed");
+        }
+
+        // Attach to correlation engine
+        try {
+          attachEvent(saved);
+        } catch (e) {
+          logger.warn({ err: e }, "correlationEngine.attachEvent failed");
+        }
+
+        // Fire-and-forget rule evaluation
+        evaluateRulesForEvent(saved).catch((e) =>
+          logger.error({ err: e, eventId: saved._id }, "Rule evaluation failed")
+        );
+
+        accepted++;
+      } catch (innerErr) {
+        logger.warn({ err: innerErr }, "batch: failed to process one event, continuing");
+      }
+    }
+
+    logger.debug({ accepted, total: payloads.length }, "batch ingested");
+    return res.status(202).json({ status: "accepted", count: accepted });
+  } catch (err: any) {
+    logger.error({ err }, "ingestBatch failed");
+    return res.status(500).json({ error: "Failed to ingest batch" });
+  }
+}
+
+export default { ingestEvent, getEvents, ingestBatch };
