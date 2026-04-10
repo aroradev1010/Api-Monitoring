@@ -37,6 +37,8 @@ export function trackExpress(): RequestHandler {
     // ── Read correlation ID from upstream caller ──────────────────
     const incomingCid =
       (req.headers["x-correlation-id"] as string | undefined) || null;
+    const incomingParentEventId =
+      (req.headers["x-parent-event-id"] as string | undefined) || null;
 
     // ── Create root context ──────────────────────────────────────
     const ctx = createRootContext(config.service, incomingCid);
@@ -54,7 +56,7 @@ export function trackExpress(): RequestHandler {
         kind: "http_request",
         operation: `${req.method} ${req.route?.path ?? req.path}`,
         correlation_id: ctx.correlationId,
-        parent_event_id: null, // ALWAYS null for root HTTP — per spec
+        parent_event_id: incomingParentEventId,
         status: res.statusCode >= 400 ? "error" : "ok",
         latency_ms: endTime - startTime,
         error_code: res.statusCode >= 400 ? String(res.statusCode) : null,

@@ -107,10 +107,31 @@ describe("trackExpress()", () => {
     const httpEvent = events.find((e) => e.kind === "http_request");
 
     expect(httpEvent).toBeDefined();
-    expect(httpEvent!.parent_event_id).toBeNull(); // ALWAYS null per spec
+    expect(httpEvent!.parent_event_id).toBeNull();
     expect(httpEvent!.http!.method).toBe("GET");
     expect(httpEvent!.http!.path).toBe("/api/users");
     expect(httpEvent!.http!.target_url).toBe("http://localhost:3000/api/users");
+  });
+
+  it("uses X-Parent-Event-ID as parent_event_id for incoming HTTP", () => {
+    const middleware = trackExpress();
+    const req = mockReq({
+      headers: {
+        "x-correlation-id": "upstream-cid",
+        "x-parent-event-id": "upstream-event-123",
+      },
+    } as any);
+    const res = mockRes();
+
+    middleware(req, res, () => {});
+    res._triggerFinish();
+
+    const events = mockAdd.mock.calls.map((c: any[]) => c[0] as EventPayload);
+    const httpEvent = events.find((e) => e.kind === "http_request");
+
+    expect(httpEvent).toBeDefined();
+    expect(httpEvent!.correlation_id).toBe("upstream-cid");
+    expect(httpEvent!.parent_event_id).toBe("upstream-event-123");
   });
 
   it("sets status to error for 4xx/5xx responses", () => {

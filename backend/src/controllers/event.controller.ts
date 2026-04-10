@@ -128,7 +128,7 @@ export async function ingestBatch(req: Request, res: Response) {
         const api = await Api.findOne({ api_id: payload.service }).lean().exec();
         if (!api) {
           logger.warn({ service: payload.service }, "batch: API not registered, skipping event");
-          continue;
+          // continue;
         }
 
         const event = new Event({

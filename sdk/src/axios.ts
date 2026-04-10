@@ -41,10 +41,11 @@ instance.interceptors.request.use(
       start_time: Date.now(),
     };
 
-    // Inject correlation header for downstream services
+    // Inject trace IDs for downstream services
     if (parentCtx) {
       config.headers = config.headers ?? {};
       config.headers["X-Correlation-ID"] = parentCtx.correlationId;
+      config.headers["X-Parent-Event-ID"] = parentCtx.currentEventId;
     }
 
     return config;

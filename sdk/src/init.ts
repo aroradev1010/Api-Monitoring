@@ -13,7 +13,7 @@ let _initialized = false;
 // ── Default values ─────────────────────────────────────────────────
 
 const DEFAULTS = {
-  ingestUrl: "http://localhost:4000",
+  ingestUrl: "http://localhost:3000",
   flushIntervalMs: 2000,
   debug: false,
   disabled: false,
